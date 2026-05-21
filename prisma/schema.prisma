@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  OWNER
+  SUPERVISOR
+  GENERAL_MANAGER
+}
+
+enum ComplaintStatus {
+  OPEN
+  ESCALATED_TO_GM
+  CRITICAL
+  RESOLVED
+}
+
+enum CleanlinessLevel {
+  VERY_CLEAN
+  CLEAN
+  NOT_CLEAN
+  DIRTY
+}
+
+enum NotificationType {
+  SMS
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id                  Int      @id @default(autoincrement())
+  name                String
+  email               String   @unique
+  phone               String
+  secondaryPhone      String?
+  passwordHash        String
+  role                Role
+  isActive            Boolean  @default(true)
+  notificationEnabled Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  supervisorAssignments WashroomAssignment[] @relation("SupervisorAssignment")
+  gmAssignments         WashroomAssignment[] @relation("GMAssignment")
+
+  resolvedComplaints Complaint[] @relation("ResolvedBy")
+  notificationLogs   NotificationLog[]
+}
+
+model Washroom {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique
+  name       String
+  floor      String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  assignments WashroomAssignment[]
+  complaints  Complaint[]
+}
+
+model WashroomAssignment {
+  id               Int      @id @default(autoincrement())
+  washroomId       Int      @unique
+  supervisorId     Int
+  generalManagerId Int
+
+  supervisorExtraEmails String? @db.Text
+  supervisorExtraPhones String? @db.Text
+
+  gmExtraEmails String? @db.Text
+  gmExtraPhones String? @db.Text
+
+  ownerEmails String? @db.Text
+  ownerPhones String? @db.Text
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  washroom       Washroom @relation(fields: [washroomId], references: [id], onDelete: Cascade)
+  supervisor     User     @relation("SupervisorAssignment", fields: [supervisorId], references: [id])
+  generalManager User     @relation("GMAssignment", fields: [generalManagerId], references: [id])
+}
+
+model Complaint {
+  id                 Int               @id @default(autoincrement())
+  complaintId        String            @unique
+
+  washroomId         Int
+  washroomCode       String
+  washroomName       String
+  floor              String
+
+  cleanlinessStatus  CleanlinessLevel
+  facilitiesWorking  Boolean
+  issueDescription   String?
+
+  status             ComplaintStatus   @default(OPEN)
+  currentLevel       Int               @default(1)
+
+  supervisorNotified Boolean           @default(false)
+  gmNotified         Boolean           @default(false)
+  ownerNotified      Boolean           @default(false)
+
+  createdAt          DateTime          @default(now())
+  resolvedAt         DateTime?
+  resolvedById       Int?
+
+  washroom           Washroom          @relation(fields: [washroomId], references: [id])
+  resolvedBy         User?             @relation("ResolvedBy", fields: [resolvedById], references: [id])
+
+  notificationLogs   NotificationLog[]
+}
+
+model NotificationLog {
+  id               Int                @id @default(autoincrement())
+  complaintId      Int
+  userId           Int
+  notificationType NotificationType
+  status           NotificationStatus
+  responseMessage  String?
+  createdAt        DateTime           @default(now())
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+model SystemSetting {
+  id                Int      @id @default(autoincrement())
+
+  supervisorTimeout Int      @default(15)
+  gmTimeout         Int      @default(30)
+
+  smsApiUrl         String?
+  smsApiKey         String?
+  smsSenderId       String?
+  smsTemplateId     String?
+
+  smtpHost          String?
+  smtpPort          Int?
+  smtpUser          String?
+  smtpPassword      String?
+
+  ccEmails          String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
