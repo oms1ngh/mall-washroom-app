@@ -19,6 +19,7 @@ enum ComplaintStatus {
   ESCALATED_TO_GM
   CRITICAL
   RESOLVED
+  POSITIVE_FEEDBACK
 }
 
 enum CleanlinessLevel {
