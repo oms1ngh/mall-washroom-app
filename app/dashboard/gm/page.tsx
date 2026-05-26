@@ -1,429 +1,918 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import {
+  useEffect,
+  useState,
+} from "react"
+
 import { signOut } from "next-auth/react"
 import Image from "next/image"
+import * as XLSX from "xlsx"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 
 type Complaint = {
   id: number
   complaintId: string
   washroomName: string
-  floor: string
   cleanlinessStatus: string
   facilitiesWorking: boolean
   issueDescription: string | null
-  complaintAgeMinutes: number
-  escalationStage: string
-  timeLeft: string
   status: string
   createdAt: string
   resolvedAt: string | null
   resolutionTime: string
+  escalationStage?: string
+  timeLeft?: string
   resolvedBy?: {
     name: string
-    role: string
   } | null
 }
 
-type Washroom = {
-  id: number
-  name: string
+type DashboardResponse = {
+  liveComplaints: Complaint[]
+  escalatedComplaints: Complaint[]
+  reportComplaints: Complaint[]
+
+  stats: {
+    totalComplaints: number
+    negativeComplaints: number
+    positiveFeedbackCount: number
+    openComplaints: number
+    resolvedComplaints: number
+    escalatedCount: number
+    criticalCount: number
+    avgResolutionMinutes: number
+  }
+
+  washrooms: {
+    id: number
+    name: string
+  }[]
+}
+
+function formatMinutes(
+  mins: number
+) {
+  if (!mins) return "0 mins"
+
+  if (mins < 60) {
+    return `${mins} mins`
+  }
+
+  const hrs = Math.floor(mins / 60)
+  const remaining = mins % 60
+
+  if (remaining === 0) {
+    return `${hrs} hr`
+  }
+
+  return `${hrs} hr ${remaining} mins`
 }
 
 export default function GMDashboard() {
-  const [activeTab, setActiveTab] = useState("live")
-  const [liveComplaints, setLiveComplaints] = useState<Complaint[]>([])
-  const [escalatedComplaints, setEscalatedComplaints] = useState<Complaint[]>([])
-  const [reportComplaints, setReportComplaints] = useState<Complaint[]>([])
-  const [washrooms, setWashrooms] = useState<Washroom[]>([])
-  const [stats, setStats] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] =
+    useState("live")
 
-  const [singleDate, setSingleDate] = useState("")
-  const [fromDate, setFromDate] = useState("")
-  const [toDate, setToDate] = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
-  const [washroomFilter, setWashroomFilter] = useState("")
+  const [liveComplaints, setLiveComplaints] =
+    useState<Complaint[]>([])
 
-  async function loadData() {
-    try {
-      const res = await fetch("/api/dashboard/gm")
-      const data = await res.json()
+  const [
+    escalatedComplaints,
+    setEscalatedComplaints,
+  ] = useState<Complaint[]>([])
 
-      setLiveComplaints(data.liveComplaints || [])
-      setEscalatedComplaints(data.escalatedComplaints || [])
-      setReportComplaints(data.reportComplaints || [])
-      setWashrooms(data.washrooms || [])
-      setStats(data.stats)
-    } catch (error) {
-      console.error(error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadData()
-
-    const interval = setInterval(() => {
-      loadData()
-    }, 60000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  const filteredReports = useMemo(() => {
-    return reportComplaints.filter((c) => {
-      if (statusFilter && c.status !== statusFilter) return false
-      if (washroomFilter && c.washroomName !== washroomFilter) return false
-
-      if (singleDate) {
-        const d = new Date(c.createdAt).toDateString()
-        const selected = new Date(singleDate).toDateString()
-        if (d !== selected) return false
-      }
-
-      if (fromDate && toDate) {
-        const created = new Date(c.createdAt).getTime()
-        const from = new Date(fromDate).getTime()
-        const to = new Date(toDate).getTime()
-
-        if (created < from || created > to + 86400000) {
-          return false
-        }
-      }
-
-      return true
-    })
-  }, [
+  const [
     reportComplaints,
-    statusFilter,
+    setReportComplaints,
+  ] = useState<Complaint[]>([])
+
+  const [washrooms, setWashrooms] =
+    useState<
+      {
+        id: number
+        name: string
+      }[]
+    >([])
+
+  const [stats, setStats] =
+    useState({
+      totalComplaints: 0,
+      negativeComplaints: 0,
+      positiveFeedbackCount: 0,
+      openComplaints: 0,
+      resolvedComplaints: 0,
+      escalatedCount: 0,
+      criticalCount: 0,
+      avgResolutionMinutes: 0,
+    })
+
+  const [singleDate, setSingleDate] =
+    useState("")
+
+  const [fromDate, setFromDate] =
+    useState("")
+
+  const [toDate, setToDate] =
+    useState("")
+
+  const [statusFilter, setStatusFilter] =
+    useState("")
+
+  const [
     washroomFilter,
-    singleDate,
-    fromDate,
-    toDate,
-  ])
+    setWashroomFilter,
+  ] = useState("")
+
+  async function fetchDashboard() {
+    const params =
+      new URLSearchParams()
+
+    if (singleDate) {
+      params.append(
+        "date",
+        singleDate
+      )
+    }
+
+    if (fromDate && toDate) {
+      params.append(
+        "from",
+        fromDate
+      )
+
+      params.append("to", toDate)
+    }
+
+    if (statusFilter) {
+      params.append(
+        "status",
+        statusFilter
+      )
+    }
+
+    if (washroomFilter) {
+      params.append(
+        "washroom",
+        washroomFilter
+      )
+    }
+
+    const res = await fetch(
+      `/api/dashboard/gm?${params.toString()}`
+    )
+
+    if (!res.ok) {
+      throw new Error(
+        "Dashboard API failed"
+      )
+    }
+
+    const data: DashboardResponse =
+      await res.json()
+
+    setLiveComplaints(
+      data.liveComplaints
+    )
+
+    setEscalatedComplaints(
+      data.escalatedComplaints
+    )
+
+    setReportComplaints(
+      data.reportComplaints
+    )
+
+    setStats(data.stats)
+    setWashrooms(data.washrooms)
+  }
 
   function clearFilters() {
-    setSingleDate("")
-    setFromDate("")
-    setToDate("")
-    setStatusFilter("")
-    setWashroomFilter("")
-  }
+  setSingleDate("")
+  setFromDate("")
+  setToDate("")
+  setStatusFilter("")
+  setWashroomFilter("")
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-xl">
-        Loading...
-      </div>
+  setTimeout(() => {
+    fetchDashboard()
+  }, 100)
+}
+
+  function exportExcel() {
+    const worksheet =
+      XLSX.utils.json_to_sheet(
+        reportComplaints.map((c) => ({
+          ComplaintID:
+            c.complaintId,
+          Washroom:
+            c.washroomName,
+          Cleanliness:
+            c.cleanlinessStatus,
+          Facilities:
+            c.facilitiesWorking
+              ? "Yes"
+              : "No",
+          Issue:
+            c.issueDescription ||
+            "No comment",
+          Status: c.status,
+          Created:
+            new Date(
+              c.createdAt
+            ).toLocaleString(),
+          Resolved:
+            c.resolvedAt
+              ? new Date(
+                  c.resolvedAt
+                ).toLocaleString()
+              : "-",
+          ResolutionTime:
+            c.resolutionTime,
+          ResolvedBy:
+            c.resolvedBy?.name ||
+            "-",
+        }))
+      )
+
+    const workbook =
+      XLSX.utils.book_new()
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "GM Report"
+    )
+
+    XLSX.writeFile(
+      workbook,
+      "gm-report.xlsx"
     )
   }
 
-  return (
+  function exportPDF() {
+    const doc = new jsPDF()
+
+    autoTable(doc, {
+      head: [
+        [
+          "Complaint",
+          "Washroom",
+          "Issue",
+          "Status",
+          "Created",
+          "Resolved",
+          "Time",
+        ],
+      ],
+
+      body:
+        reportComplaints.map((c) => [
+          c.complaintId,
+          c.washroomName,
+          c.issueDescription ||
+            "No comment",
+          c.status,
+          new Date(
+            c.createdAt
+          ).toLocaleString(),
+          c.resolvedAt
+            ? new Date(
+                c.resolvedAt
+              ).toLocaleString()
+            : "-",
+          c.resolutionTime,
+        ]),
+    })
+
+    doc.save("gm-report.pdf")
+  }
+
+  useEffect(() => {
+  fetchDashboard()
+}, [
+  singleDate,
+  fromDate,
+  toDate,
+  statusFilter,
+  washroomFilter,
+])
+    return (
     <div className="min-h-screen bg-slate-100">
-      <header className="bg-white border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-4">
-            <Image
-              src="/sam-logo.jpg"
-              alt="South Avenue Mall"
-              width={80}
-              height={80}
-              className="w-auto h-auto"
-            />
+      <header className="bg-white border-b shadow-sm px-4 md:px-10 py-4 md:py-6 flex flex-col md:flex-row justify-between gap-4 md:items-center">
+        <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
+          <Image
+            src="/sam-logo.jpg"
+            alt="South Avenue Mall"
+            width={120}
+            height={60}
+            className="h-10 md:h-14 w-auto"
+          />
 
-            <div>
-              <h1 className="text-2xl md:text-4xl font-bold text-slate-900">
-                General Manager Dashboard
-              </h1>
+          <div>
+            <h1 className="text-2xl md:text-4xl font-bold text-slate-900">
+              GM Dashboard
+            </h1>
 
-              <p className="text-slate-600">
-                South Avenue Mall Washroom Monitoring System
-              </p>
-            </div>
+            <p className="text-slate-600 text-sm md:text-xl">
+              South Avenue Mall Washroom Monitoring System
+            </p>
           </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6">
+          <span className="text-base md:text-xl">
+            Welcome, General Manager
+          </span>
 
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="bg-pink-600 text-white px-6 py-3 rounded-xl font-semibold"
+            onClick={() =>
+              signOut({
+                callbackUrl:
+                  "/login",
+              })
+            }
+            className="bg-pink-600 text-white px-6 md:px-8 py-3 rounded-2xl font-bold w-full md:w-auto"
           >
             Logout
           </button>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto p-4 md:p-6">
-        <div className="flex flex-wrap gap-4 mb-8">
+      <main className="p-4 md:p-10">
+        <div className="bg-white rounded-3xl shadow-lg p-6 mb-8">
+          <h2 className="text-2xl font-bold mb-6">
+            Filter Complaints
+          </h2>
+
+          <div className="grid md:grid-cols-6 gap-4">
+            <div>
+              <label className="block mb-2 font-semibold">
+                Single Date
+              </label>
+
+              <input
+                type="date"
+                value={singleDate}
+                onChange={(e) =>
+                  setSingleDate(
+                    e.target.value
+                  )
+                }
+                className="border p-3 rounded-xl w-full"
+              />
+            </div>
+
+            <button
+              onClick={
+                fetchDashboard
+              }
+              className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold mt-8"
+            >
+              Apply Date
+            </button>
+
+            <div>
+              <label className="block mb-2 font-semibold">
+                From Date
+              </label>
+
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) =>
+                  setFromDate(
+                    e.target.value
+                  )
+                }
+                className="border p-3 rounded-xl w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-2 font-semibold">
+                To Date
+              </label>
+
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) =>
+                  setToDate(
+                    e.target.value
+                  )
+                }
+                className="border p-3 rounded-xl w-full"
+              />
+            </div>
+
+            <button
+              onClick={
+                fetchDashboard
+              }
+              className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold mt-8"
+            >
+              Apply Range
+            </button>
+
+            <button
+              onClick={
+                clearFilters
+              }
+              className="bg-gray-600 text-white px-6 py-3 rounded-xl font-bold mt-8"
+            >
+              Clear
+            </button>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4 mt-6">
+            <div>
+              <label className="block mb-2 font-semibold">
+                Status
+              </label>
+
+              <select
+                value={
+                  statusFilter
+                }
+                onChange={(e) =>
+                  setStatusFilter(
+                    e.target.value
+                  )
+                }
+                className="border p-3 rounded-xl w-full"
+              >
+                <option value="">
+                  All Status
+                </option>
+                <option value="OPEN">
+                  Open
+                </option>
+                <option value="RESOLVED">
+                  Resolved
+                </option>
+                <option value="ESCALATED_TO_GM">
+                  Escalated
+                </option>
+                <option value="CRITICAL">
+                  Critical
+                </option>
+                <option value="POSITIVE_FEEDBACK">
+                  Positive Feedback
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block mb-2 font-semibold">
+                Washroom
+              </label>
+
+              <select
+                value={
+                  washroomFilter
+                }
+                onChange={(e) =>
+                  setWashroomFilter(
+                    e.target.value
+                  )
+                }
+                className="border p-3 rounded-xl w-full"
+              >
+                <option value="">
+                  All Washrooms
+                </option>
+
+                {washrooms.map(
+                  (w) => (
+                    <option
+                      key={w.id}
+                      value={
+                        w.name
+                      }
+                    >
+                      {w.name}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4 mt-6">
+            <button
+              onClick={
+                exportExcel
+              }
+              className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold"
+            >
+              Export Excel
+            </button>
+
+            <button
+              onClick={
+                exportPDF
+              }
+              className="bg-red-600 text-white px-6 py-4 rounded-2xl font-bold"
+            >
+              Export PDF
+            </button>
+          </div>
+        </div>
+                <div className="flex flex-wrap gap-4 mb-8">
           <button
-            onClick={() => setActiveTab("live")}
-            className={`px-6 py-3 rounded-xl font-semibold ${
-              activeTab === "live" ? "bg-blue-600 text-white" : "bg-white shadow"
+            onClick={() =>
+              setActiveTab("live")
+            }
+            className={`px-6 py-3 rounded-2xl font-bold ${
+              activeTab === "live"
+                ? "bg-blue-600 text-white"
+                : "bg-white border"
             }`}
           >
             Live Monitoring
           </button>
 
           <button
-            onClick={() => setActiveTab("escalated")}
-            className={`px-6 py-3 rounded-xl font-semibold ${
-              activeTab === "escalated" ? "bg-red-600 text-white" : "bg-white shadow"
+            onClick={() =>
+              setActiveTab(
+                "escalated"
+              )
+            }
+            className={`px-6 py-3 rounded-2xl font-bold ${
+              activeTab ===
+              "escalated"
+                ? "bg-orange-600 text-white"
+                : "bg-white border"
             }`}
           >
             Escalated
           </button>
 
           <button
-            onClick={() => setActiveTab("reports")}
-            className={`px-6 py-3 rounded-xl font-semibold ${
-              activeTab === "reports" ? "bg-green-600 text-white" : "bg-white shadow"
+            onClick={() =>
+              setActiveTab("report")
+            }
+            className={`px-6 py-3 rounded-2xl font-bold ${
+              activeTab === "report"
+                ? "bg-purple-600 text-white"
+                : "bg-white border"
             }`}
           >
             Reports
           </button>
         </div>
 
-        {/* LIVE MONITORING */}
-        {activeTab === "live" && (
-          <div className="grid gap-6">
-            {liveComplaints.map((c) => (
-              <div key={c.id} className="bg-white rounded-2xl shadow p-6">
-                <p>
-                  <strong>ID:</strong> {c.complaintId}
-                </p>
-                <p>
-                  <strong>Washroom:</strong> {c.washroomName}
-                </p>
-                <p>
-                  <strong>Status:</strong> {c.status}
-                </p>
-                <p>
-                  <strong>Issue:</strong> {c.issueDescription || "No comment"}
-                </p>
+        <div className="grid md:grid-cols-5 gap-6 mb-8">
+          <div className="bg-blue-600 text-white rounded-3xl p-6 shadow-lg">
+            <p className="text-lg">
+              Total Complaints
+            </p>
 
-                {c.status === "RESOLVED" ? (
-                  <div className="mt-4 space-y-2">
-                    <p>
-                      <strong>Complaint Received:</strong>{" "}
-                      {new Date(c.createdAt).toLocaleString()}
-                    </p>
+            <h3 className="text-4xl font-bold mt-2">
+              {
+                stats.totalComplaints
+              }
+            </h3>
 
-                    <p>
-                      <strong>Resolved At:</strong>{" "}
-                      {c.resolvedAt
-                        ? new Date(c.resolvedAt).toLocaleString()
-                        : "-"}
-                    </p>
+            <p className="mt-3 text-sm">
+              Negative:{" "}
+              {
+                stats.negativeComplaints
+              }
+            </p>
 
-                    <p>
-                      <strong>Resolved By:</strong> {c.resolvedBy?.name || "-"}
-                    </p>
-
-                    <p className="text-green-600 font-semibold">
-                      Resolution Time: {c.resolutionTime}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-4 space-y-2">
-                    <p className="text-orange-600 font-semibold">
-                      Complaint Age: {c.complaintAgeMinutes} mins
-                    </p>
-
-                    <p className="text-blue-700 font-semibold">{c.timeLeft}</p>
-                  </div>
-                )}
-              </div>
-            ))}
+            <p className="text-sm">
+              Positive:{" "}
+              {
+                stats.positiveFeedbackCount
+              }
+            </p>
           </div>
-        )}
 
-        {/* ESCALATED */}
-        {activeTab === "escalated" && (
-          <div className="grid gap-6">
-            {escalatedComplaints.map((c) => (
-              <div key={c.id} className="bg-white rounded-2xl shadow p-6">
-                <p>
-                  <strong>ID:</strong> {c.complaintId}
-                </p>
-                <p>
-                  <strong>Washroom:</strong> {c.washroomName}
-                </p>
-                <p>
-                  <strong>Status:</strong> {c.status}
-                </p>
-                <p>
-                  <strong>Issue:</strong> {c.issueDescription || "No comment"}
-                </p>
+          <div className="bg-green-600 text-white rounded-3xl p-6 shadow-lg">
+            <p className="text-lg">
+              Resolved
+            </p>
 
-                <p className="text-red-600 font-bold">
-                  {c.complaintAgeMinutes >= 30
-                    ? "Escalated to Owner (30 mins exceeded)"
-                    : "Escalated to GM — supervisor action overdue"}
-                </p>
-
-                <p className="text-blue-700 font-semibold">
-                  {c.complaintAgeMinutes >= 30
-                    ? "Immediate owner attention required"
-                    : c.timeLeft}
-                </p>
-              </div>
-            ))}
+            <h3 className="text-4xl font-bold mt-2">
+              {
+                stats.resolvedComplaints
+              }
+            </h3>
           </div>
-        )}
 
-        {/* REPORTS */}
-        {activeTab === "reports" && (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-              <div className="bg-pink-600 text-white p-6 rounded-2xl">
-                <div className="text-3xl font-bold">{stats.totalComplaints}</div>
-                <div>Total</div>
-              </div>
+          <div className="bg-orange-600 text-white rounded-3xl p-6 shadow-lg">
+            <p className="text-lg">
+              Escalated to GM
+            </p>
 
-              <div className="bg-yellow-500 text-white p-6 rounded-2xl">
-                <div className="text-3xl font-bold">{stats.openComplaints}</div>
-                <div>Open</div>
-              </div>
+            <h3 className="text-4xl font-bold mt-2">
+              {
+                stats.escalatedCount
+              }
+            </h3>
+          </div>
 
-              <div className="bg-green-600 text-white p-6 rounded-2xl">
-                <div className="text-3xl font-bold">{stats.resolvedComplaints}</div>
-                <div>Resolved</div>
-              </div>
+          <div className="bg-red-600 text-white rounded-3xl p-6 shadow-lg">
+            <p className="text-lg">
+              Critical
+            </p>
 
-              <div className="bg-orange-500 text-white p-6 rounded-2xl">
-                <div className="text-3xl font-bold">{stats.escalatedCount}</div>
-                <div>Escalated</div>
-              </div>
+            <h3 className="text-4xl font-bold mt-2">
+              {
+                stats.criticalCount
+              }
+            </h3>
+          </div>
 
-              <div className="bg-red-600 text-white p-6 rounded-2xl">
-                <div className="text-3xl font-bold">{stats.criticalCount}</div>
-                <div>Critical</div>
-              </div>
+          <div className="bg-purple-600 text-white rounded-3xl p-6 shadow-lg">
+            <p className="text-lg">
+              Avg Resolution
+            </p>
+
+            <h3 className="text-3xl font-bold mt-2">
+              {formatMinutes(
+                stats.avgResolutionMinutes
+              )}
+            </h3>
+          </div>
+        </div>
+
+        {activeTab ===
+          "live" && (
+          <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-200">
+  <tr>
+    <th className="p-4 text-left">
+      Complaint ID
+    </th>
+
+    <th className="p-4 text-left">
+      Washroom
+    </th>
+
+    <th className="p-4 text-left">
+      Issue
+    </th>
+
+    <th className="p-4 text-left">
+      Status
+    </th>
+
+    <th className="p-4 text-left">
+      Created
+    </th>
+
+    <th className="p-4 text-left">
+      Resolution Time
+    </th>
+  </tr>
+</thead>
+
+                <tbody>
+                  {liveComplaints.map(
+                    (c) => (
+                      <tr
+                        key={c.id}
+                        className="border-t"
+                      >
+                        <td className="p-4">
+                          {
+                            c.complaintId
+                          }
+                        </td>
+
+                        <td className="p-4">
+                          {
+                            c.washroomName
+                          }
+                        </td>
+
+                        <td className="p-4">
+                          {c.issueDescription ||
+                            "No comment"}
+                        </td>
+
+                        <td className="p-4">
+                          {c.status}
+                        </td>
+
+                        <td className="p-4">
+                          {new Date(
+                          c.createdAt
+                          ).toLocaleString()}
+                        </td>
+
+                        <td className="p-4">
+                          {
+                            c.escalationStage
+                          }
+                        </td>
+
+                        <td className="p-4">
+                          {c.timeLeft}
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
             </div>
-
-            <div className="bg-white rounded-2xl shadow p-6 mb-6">
-  <div className="flex flex-wrap gap-6 items-end">
-    <div className="flex flex-col">
-      <label className="text-sm font-semibold mb-2">
-        Single Date
-      </label>
-      <input
-        type="date"
-        value={singleDate}
-        onChange={(e) => setSingleDate(e.target.value)}
-        className="border p-3 rounded-xl"
-      />
-    </div>
-
-    <div className="flex flex-col">
-      <label className="text-sm font-semibold mb-2">
-        From Date
-      </label>
-      <input
-        type="date"
-        value={fromDate}
-        onChange={(e) => setFromDate(e.target.value)}
-        className="border p-3 rounded-xl"
-      />
-    </div>
-
-    <div className="flex flex-col">
-      <label className="text-sm font-semibold mb-2">
-        To Date
-      </label>
-      <input
-        type="date"
-        value={toDate}
-        onChange={(e) => setToDate(e.target.value)}
-        className="border p-3 rounded-xl"
-      />
-    </div>
-
-    <div className="flex flex-col">
-      <label className="text-sm font-semibold mb-2">
-        Status
-      </label>
-      <select
-        value={statusFilter}
-        onChange={(e) => setStatusFilter(e.target.value)}
-        className="border p-3 rounded-xl"
-      >
-        <option value="">All Status</option>
-        <option value="OPEN">OPEN</option>
-        <option value="RESOLVED">RESOLVED</option>
-        <option value="ESCALATED_TO_GM">ESCALATED</option>
-        <option value="CRITICAL">CRITICAL</option>
-      </select>
-    </div>
-
-    <div className="flex flex-col">
-      <label className="text-sm font-semibold mb-2">
-        Washroom
-      </label>
-      <select
-        value={washroomFilter}
-        onChange={(e) => setWashroomFilter(e.target.value)}
-        className="border p-3 rounded-xl"
-      >
-        <option value="">All Washrooms</option>
-
-        {washrooms.map((w) => (
-          <option key={w.id} value={w.name}>
-            {w.name}
-          </option>
-        ))}
-      </select>
-    </div>
-
-    <button
-      onClick={clearFilters}
-      className="bg-gray-600 text-white px-6 py-3 rounded-xl"
-    >
-      Clear
-    </button>
-  </div>
-</div>
-
-<div className="bg-white rounded-2xl shadow overflow-auto">
-  <table className="w-full min-w-[1500px]">
-    <thead className="bg-slate-900 text-white">
-      <tr>
-        <th className="p-4 text-left">Complaint</th>
-        <th className="p-4 text-left">Washroom</th>
-        <th className="p-4 text-left">Status</th>
-        <th className="p-4 text-left">Issue</th>
-        <th className="p-4 text-left">Created</th>
-        <th className="p-4 text-left">Resolved</th>
-        <th className="p-4 text-left">Resolved By</th>
-        <th className="p-4 text-left">Resolution Time</th>
-      </tr>
-    </thead>
-
-    <tbody>
-      {filteredReports.map((c) => (
-        <tr key={c.id} className="border-b">
-          <td className="p-4">{c.complaintId}</td>
-          <td className="p-4">{c.washroomName}</td>
-          <td className="p-4">{c.status}</td>
-          <td className="p-4">{c.issueDescription || "-"}</td>
-          <td className="p-4">
-            {new Date(c.createdAt).toLocaleString()}
-          </td>
-          <td className="p-4">
-            {c.resolvedAt
-              ? new Date(c.resolvedAt).toLocaleString()
-              : "-"}
-          </td>
-          <td className="p-4">{c.resolvedBy?.name || "-"}</td>
-          <td className="p-4">{c.resolutionTime}</td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
-          </>
+          </div>
         )}
-      </div>
+
+        {activeTab ===
+          "escalated" && (
+          <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-200">
+                  <tr>
+                    <th className="p-4 text-left">
+                      Complaint ID
+                    </th>
+                    <th className="p-4 text-left">
+                      Washroom
+                    </th>
+                    <th className="p-4 text-left">
+                      Issue
+                    </th>
+                    <th className="p-4 text-left">
+                      Status
+                    </th>
+                    <th className="p-4 text-left">
+                      Resolution
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {escalatedComplaints.map(
+                    (c) => (
+                      <tr
+                        key={c.id}
+                        className="border-t"
+                      >
+                        <td className="p-4">
+                          {
+                            c.complaintId
+                          }
+                        </td>
+
+                        <td className="p-4">
+                          {
+                            c.washroomName
+                          }
+                        </td>
+
+                        <td className="p-4">
+                          {c.issueDescription ||
+                            "No comment"}
+                        </td>
+
+                        <td className="p-4">
+                          {c.status}
+                        </td>
+                        
+                        <td className="p-4">
+  {new Date(
+    c.createdAt
+  ).toLocaleString()}
+</td>
+
+                        <td className="p-4">
+                          {
+                            c.resolutionTime
+                          }
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+                {activeTab ===
+          "report" && (
+          <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-200">
+                  <tr>
+                    <th className="p-4 text-left">
+                      Complaint ID
+                    </th>
+                    <th className="p-4 text-left">
+                      Washroom
+                    </th>
+                    <th className="p-4 text-left">
+                      Cleanliness
+                    </th>
+                    <th className="p-4 text-left">
+                      Facilities
+                    </th>
+                    <th className="p-4 text-left">
+                      Issue
+                    </th>
+                    <th className="p-4 text-left">
+                      Status
+                    </th>
+                    <th className="p-4 text-left">
+                      Created
+                    </th>
+                    <th className="p-4 text-left">
+                      Resolved
+                    </th>
+                    <th className="p-4 text-left">
+                      Resolution Time
+                    </th>
+                    <th className="p-4 text-left">
+                      Resolved By
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {reportComplaints.map(
+                    (c) => (
+                      <tr
+                        key={c.id}
+                        className="border-t"
+                      >
+                        <td className="p-4">
+                          {
+                            c.complaintId
+                          }
+                        </td>
+
+                        <td className="p-4">
+                          {
+                            c.washroomName
+                          }
+                        </td>
+
+                        <td className="p-4">
+                          {
+                            c.cleanlinessStatus
+                          }
+                        </td>
+
+                        <td className="p-4">
+                          {c.facilitiesWorking
+                            ? "Yes"
+                            : "No"}
+                        </td>
+
+                        <td className="p-4">
+                          {c.issueDescription?.trim()
+                            ? c.issueDescription
+                            : c.status ===
+                              "POSITIVE_FEEDBACK"
+                            ? "Positive feedback"
+                            : "No comment"}
+                        </td>
+
+                        <td className="p-4">
+                          {c.status}
+                        </td>
+
+                        <td className="p-4">
+                          {new Date(
+                            c.createdAt
+                          ).toLocaleString()}
+                        </td>
+
+                        <td className="p-4">
+                          {c.resolvedAt
+                            ? new Date(
+                                c.resolvedAt
+                              ).toLocaleString()
+                            : "-"}
+                        </td>
+
+                        <td className="p-4">
+                          {
+                            c.resolutionTime
+                          }
+                        </td>
+
+                        <td className="p-4">
+                          {c.resolvedBy
+                            ?.name || "-"}
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   )
 }

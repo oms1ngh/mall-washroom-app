@@ -11,6 +11,12 @@ export async function POST(req: Request) {
 
     console.log("Incoming:", body)
 
+    const origin =
+      new URL(req.url).origin
+
+    const supervisorDashboardLink =
+      `${origin}/dashboard/supervisor`
+
     const washroom =
       await prisma.washroom.findUnique({
         where: {
@@ -84,16 +90,16 @@ export async function POST(req: Request) {
 
           issueDescription:
             body.issueDescription ||
+            body.feedback ||
+            body.comment ||
+            body.comments ||
             null,
 
           status: autoResolved
-            ? "RESOLVED"
+            ? "POSITIVE_FEEDBACK"
             : "OPEN",
 
-          resolvedAt:
-            autoResolved
-              ? new Date()
-              : null,
+          resolvedAt: null,
 
           supervisorNotified:
             !autoResolved &&
@@ -124,7 +130,7 @@ export async function POST(req: Request) {
           .filter(Boolean)
           .join(",")
 
-     sendEmail({
+      sendEmail({
         to: supervisorEmails,
         subject:
           "South Avenue Mall Service Notification",
@@ -149,11 +155,6 @@ export async function POST(req: Request) {
             </p>
 
             <p>
-              <strong>Floor:</strong>
-              ${complaint.floor}
-            </p>
-
-            <p>
               <strong>Cleanliness:</strong>
               ${complaint.cleanlinessStatus}
             </p>
@@ -175,26 +176,29 @@ export async function POST(req: Request) {
               }
             </p>
 
+            <p>
+              <strong>Dashboard:</strong>
+              <a href="${supervisorDashboardLink}">
+                ${supervisorDashboardLink}
+              </a>
+            </p>
+
             <hr />
 
             <p style="color:red; font-weight:bold;">
               Please resolve within 15 minutes.
             </p>
-
-            <p style="color:red; font-weight:bold;">
-              If unresolved, escalation will be sent automatically.
-            </p>
           </div>
         `,
       })
 
-     sendSupervisorSMS(
+      sendSupervisorSMS(
         supervisorPhones,
         complaint.complaintId,
         complaint.washroomName,
-        complaint.floor,
         complaint.issueDescription ||
-          "No details"
+          "No details",
+        supervisorDashboardLink
       )
     }
 

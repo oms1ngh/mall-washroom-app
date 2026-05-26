@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
-function getResolutionTime(createdAt: Date, resolvedAt: Date | null) {
+function getResolutionTime(
+  createdAt: Date,
+  resolvedAt: Date | null
+) {
   if (!resolvedAt) return "-"
 
   const diffMs =
@@ -24,37 +27,6 @@ function getResolutionTime(createdAt: Date, resolvedAt: Date | null) {
   return `${hrs} hr ${remainingMins} mins`
 }
 
-function getDynamicStatus(complaint: any) {
-  if (
-    complaint.cleanlinessStatus === "CLEAN" ||
-    complaint.cleanlinessStatus === "VERY_CLEAN"
-  ) {
-    return "POSITIVE_FEEDBACK"
-  }
-
-  if (complaint.resolvedAt) {
-    return "RESOLVED"
-  }
-
-  const now = new Date()
-
-  const diffMs =
-    now.getTime() -
-    new Date(complaint.createdAt).getTime()
-
-  const mins = Math.floor(diffMs / 60000)
-
-  if (mins >= 30) {
-    return "CRITICAL"
-  }
-
-  if (mins >= 15) {
-    return "ESCALATED_TO_GM"
-  }
-
-  return "OPEN"
-}
-
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -62,6 +34,8 @@ export async function GET(req: Request) {
     const singleDate = searchParams.get("date")
     const fromDate = searchParams.get("from")
     const toDate = searchParams.get("to")
+    const status = searchParams.get("status")
+    const washroom = searchParams.get("washroom")
 
     let whereClause: any = {}
 
@@ -91,12 +65,19 @@ export async function GET(req: Request) {
       }
     }
 
+    if (status) {
+      whereClause.status = status
+    }
+
+    if (washroom) {
+      whereClause.washroomName = washroom
+    }
+
     const complaints = await prisma.complaint.findMany({
       where: whereClause,
       orderBy: {
         createdAt: "desc",
       },
-      take: 100,
       include: {
         resolvedBy: {
           select: {
@@ -106,70 +87,134 @@ export async function GET(req: Request) {
       },
     })
 
+    const washrooms =
+      await prisma.washroom.findMany({
+        where: {
+          active: true,
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      })
+
     let openComplaints = 0
     let resolvedComplaints = 0
     let escalatedToGM = 0
     let criticalComplaints = 0
     let positiveFeedbackCount = 0
 
-    const formattedComplaints = complaints.map((c) => {
-      const dynamicStatus = getDynamicStatus(c)
+    const resolvedItems = complaints.filter(
+      (c) =>
+        c.resolvedAt &&
+        c.status === "RESOLVED"
+    )
 
-      if (dynamicStatus === "OPEN") {
-        openComplaints++
-      }
+    const avgResolutionMinutes =
+      resolvedItems.length > 0
+        ? Math.round(
+            resolvedItems.reduce(
+              (sum, c) =>
+                sum +
+                (
+                  new Date(
+                    c.resolvedAt!
+                  ).getTime() -
+                  new Date(
+                    c.createdAt
+                  ).getTime()
+                ) /
+                  60000,
+              0
+            ) / resolvedItems.length
+          )
+        : 0
 
-      if (dynamicStatus === "RESOLVED") {
-        resolvedComplaints++
-      }
+    const formattedComplaints =
+      complaints.map((c) => {
+        if (c.status === "OPEN") {
+          openComplaints++
+        }
 
-      if (dynamicStatus === "ESCALATED_TO_GM") {
-        escalatedToGM++
-      }
+        if (c.resolvedAt) {
+          resolvedComplaints++
+        }
 
-      if (dynamicStatus === "CRITICAL") {
-        criticalComplaints++
-      }
+        if (c.gmNotified) {
+          escalatedToGM++
+        }
 
-      if (dynamicStatus === "POSITIVE_FEEDBACK") {
-        positiveFeedbackCount++
-      }
+        if (c.ownerNotified) {
+          criticalComplaints++
+        }
 
-      return {
-        ...c,
+        if (
+          c.status ===
+          "POSITIVE_FEEDBACK"
+        ) {
+          positiveFeedbackCount++
+        }
 
-        issueDescription:
-          c.cleanlinessStatus === "CLEAN" ||
-          c.cleanlinessStatus === "VERY_CLEAN"
-            ? "No action needed"
-            : c.issueDescription || "No comment",
+        return {
+          ...c,
+issueDescription:
+  c.issueDescription?.trim()
+    ? c.issueDescription
+    : c.status ===
+      "POSITIVE_FEEDBACK"
+    ? "Positive feedback"
+    : "No comment",
 
-        status: dynamicStatus,
+          resolvedByName:
+            c.resolvedBy?.name || "-",
 
-        resolvedByName: c.resolvedBy?.name || "-",
-
-        resolutionTime: getResolutionTime(
-          c.createdAt,
-          c.resolvedAt
-        ),
-      }
-    })
+          resolutionTime:
+            getResolutionTime(
+              c.createdAt,
+              c.resolvedAt
+            ),
+        }
+      })
 
     return NextResponse.json({
-      totalComplaints: complaints.length,
+      totalComplaints:
+        complaints.length,
+
+      negativeComplaints:
+        complaints.length -
+        positiveFeedbackCount,
+
       openComplaints,
+
       resolvedComplaints,
+
       positiveFeedbackCount,
+
       escalatedToGM,
-      escalatedToDirector: criticalComplaints,
-      recentComplaints: formattedComplaints,
+
+      escalatedToDirector:
+        criticalComplaints,
+
+      avgResolutionMinutes,
+
+      recentComplaints:
+        formattedComplaints,
+
+      washrooms,
     })
   } catch (error) {
-    console.error("OWNER DASHBOARD API ERROR:", error)
+    console.error(
+      "OWNER DASHBOARD API ERROR:",
+      error
+    )
 
     return NextResponse.json(
       {
-        error: "Dashboard API failed",
+        error:
+          "Dashboard API failed",
       },
       {
         status: 500,

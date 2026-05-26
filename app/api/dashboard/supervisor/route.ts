@@ -5,15 +5,23 @@ import { authOptions } from "@/lib/auth"
 
 function getComplaintTimer(createdAt: Date) {
   const now = new Date()
-  const diffMs = now.getTime() - new Date(createdAt).getTime()
-  const minutes = Math.floor(diffMs / 60000)
+  const diffMs =
+    now.getTime() -
+    new Date(createdAt).getTime()
 
-  let escalationStage = "Supervisor Window"
+  const minutes = Math.floor(
+    diffMs / 60000
+  )
+
+  let escalationStage =
+    "Supervisor Window"
 
   if (minutes >= 30) {
-    escalationStage = "Critical Owner Alert"
+    escalationStage =
+      "Critical Owner Alert"
   } else if (minutes >= 15) {
-    escalationStage = "GM Escalation Window"
+    escalationStage =
+      "GM Escalation Window"
   }
 
   return {
@@ -24,70 +32,113 @@ function getComplaintTimer(createdAt: Date) {
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
+    const session =
+      await getServerSession(
+        authOptions
+      )
 
     if (!session?.user?.email) {
       return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+        {
+          error: "Unauthorized",
+        },
+        {
+          status: 401,
+        }
       )
     }
 
-    const user = await prisma.user.findUnique({
-      where: {
-        email: session.user.email,
-      },
-    })
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          email:
+            session.user.email,
+        },
+      })
 
-    if (!user || user.role !== "SUPERVISOR") {
+    if (
+      !user ||
+      user.role !== "SUPERVISOR"
+    ) {
       return NextResponse.json(
-        { error: "Access denied" },
-        { status: 403 }
+        {
+          error: "Access denied",
+        },
+        {
+          status: 403,
+        }
       )
     }
 
-    const assignments = await prisma.washroomAssignment.findMany({
-      where: {
-        supervisorId: user.id,
-      },
-      select: {
-        washroomId: true,
-      },
-    })
+    const assignments =
+      await prisma.washroomAssignment.findMany(
+        {
+          where: {
+            supervisorId:
+              user.id,
+          },
+          select: {
+            washroomId: true,
+          },
+        }
+      )
 
-    const washroomIds = assignments.map((a) => a.washroomId)
+    const washroomIds =
+      assignments.map(
+        (a) => a.washroomId
+      )
 
-    const rawComplaints = await prisma.complaint.findMany({
-      where: {
-        washroomId: {
-          in: washroomIds,
-        },
-        status: {
-          in: ["OPEN", "ESCALATED_TO_GM"],
-        },
-        cleanlinessStatus: {
-          in: ["NOT_CLEAN", "DIRTY"],
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    })
+    const rawComplaints =
+      await prisma.complaint.findMany(
+        {
+          where: {
+            washroomId: {
+              in: washroomIds,
+            },
 
-    const complaints = rawComplaints.map((complaint) => ({
-      ...complaint,
-      ...getComplaintTimer(complaint.createdAt),
-    }))
+            resolvedAt: null,
+
+            status: {
+              in: [
+                "OPEN",
+                "ESCALATED_TO_GM",
+                "CRITICAL",
+              ],
+            },
+          },
+
+          orderBy: {
+            createdAt: "desc",
+          },
+        }
+      )
+
+    const complaints =
+      rawComplaints.map(
+        (complaint) => ({
+          ...complaint,
+          ...getComplaintTimer(
+            complaint.createdAt
+          ),
+        })
+      )
 
     return NextResponse.json({
       complaints,
     })
   } catch (error) {
-    console.error("SUPERVISOR DASHBOARD ERROR:", error)
+    console.error(
+      "SUPERVISOR DASHBOARD ERROR:",
+      error
+    )
 
     return NextResponse.json(
-      { error: "Dashboard failed" },
-      { status: 500 }
+      {
+        error: "Dashboard failed",
+      },
+      {
+        status: 500,
+      }
     )
   }
 }

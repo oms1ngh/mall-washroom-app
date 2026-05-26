@@ -6,9 +6,18 @@ import {
   sendOwnerSMS,
 } from "@/lib/mailer"
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const now = new Date()
+
+    const origin =
+      new URL(req.url).origin
+
+    const gmDashboardLink =
+      `${origin}/dashboard/gm`
+
+    const ownerDashboardLink =
+      `${origin}/dashboard/owner`
 
     const complaints =
       await prisma.complaint.findMany({
@@ -107,16 +116,18 @@ export async function GET() {
               </p>
 
               <p>
-                <strong>Floor:</strong>
-                ${complaint.floor}
-              </p>
-
-              <p>
                 <strong>Issue:</strong>
                 ${
                   complaint.issueDescription ||
                   "No details"
                 }
+              </p>
+
+              <p>
+                <strong>Dashboard:</strong>
+                <a href="${gmDashboardLink}">
+                  ${gmDashboardLink}
+                </a>
               </p>
             </div>
           `,
@@ -126,9 +137,9 @@ export async function GET() {
           gmPhones,
           complaint.complaintId,
           complaint.washroomName,
-          complaint.floor,
           complaint.issueDescription ||
-            "No details"
+            "No details",
+          gmDashboardLink
         )
 
         await prisma.complaint.update({
@@ -194,16 +205,18 @@ export async function GET() {
               </p>
 
               <p>
-                <strong>Floor:</strong>
-                ${complaint.floor}
-              </p>
-
-              <p>
                 <strong>Issue:</strong>
                 ${
                   complaint.issueDescription ||
                   "No details"
                 }
+              </p>
+
+              <p>
+                <strong>Dashboard:</strong>
+                <a href="${ownerDashboardLink}">
+                  ${ownerDashboardLink}
+                </a>
               </p>
             </div>
           `,
@@ -213,9 +226,9 @@ export async function GET() {
           ownerPhones,
           complaint.complaintId,
           complaint.washroomName,
-          complaint.floor,
           complaint.issueDescription ||
-            "No details"
+            "No details",
+          ownerDashboardLink
         )
 
         await prisma.complaint.update({

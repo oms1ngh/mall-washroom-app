@@ -35,8 +35,6 @@ export async function sendEmail({
         },
       })
 
-  
-
     const toList = parseList(to)
     const ccList = parseList(cc)
 
@@ -107,84 +105,122 @@ export async function sendSupervisorSMS(
   numbers: string,
   complaintId: string,
   washroomName: string,
-  floor: string,
-  issue: string
+  issue: string,
+  dashboardUrl: string
 ) {
   const phoneList =
     parseList(numbers)
 
   await Promise.all(
-  phoneList.map((phone) => {
-    const url =
-      `${SMS_BASE}?user=moviem` +
-      `&password=Password@1` +
-      `&senderid=MOVIEM` +
-      `&channel=TRANS` +
-      `&DCS=0` +
-      `&flashsms=0` +
-      `&number=${phone}` +
-      `&text=Alert:%20New%20washroom%20complaint%20received.%20ID:%20${complaintId}%20Washroom:%20${washroomName}%20Floor:%20${floor}%20Issue:%20${issue}%20Please%20resolve%20within%2015%20minutes%20to%20avoid%20escalation.%20MOVIEM` +
-      `&route=15` +
-      `&DLTTemplateId=1707177933910108666` +
-      `&PEID=1701160257275217983`
+    phoneList.map((phone) => {
+      const message =
+        `साउथ एवेन्यू मॉल अलर्ट: ` +
+        `नई वॉशरूम शिकायत प्राप्त हुई। ` +
+        `आईडी: ${complaintId} ` +
+        `वॉशरूम: ${washroomName} ` +
+        `समस्या: ${issue} ` +
+        `15 मिनट में समाधान करें। ` +
+        `कृपया लॉगिन करके शिकायत का समाधान करें: ${dashboardUrl} ` +
+        `MOVIEM`
 
-    return callSms(url)
-  })
-)
+      const url =
+        `${SMS_BASE}?user=moviem` +
+        `&password=Password@1` +
+        `&senderid=MOVIEM` +
+        `&channel=TRANS` +
+        `&DCS=8` +
+        `&flashsms=0` +
+        `&number=${phone}` +
+        `&text=${encodeURIComponent(
+          message
+        )}` +
+        `&route=6` +
+        `&DLTTemplateId=1707177953899344364` +
+        `&PEID=1701160257275217983`
+
+      return callSms(url)
+    })
+  )
 }
 
 export async function sendGMSMS(
   numbers: string,
   complaintId: string,
   washroomName: string,
-  floor: string,
-  issue: string
+  issue: string,
+  dashboardUrl: string
 ) {
   const phoneList =
     parseList(numbers)
 
-  for (const phone of phoneList) {
-    const url =
-      `${SMS_BASE}?user=moviem` +
-      `&password=Password@1` +
-      `&senderid=MOVIEM` +
-      `&channel=TRANS` +
-      `&DCS=0` +
-      `&flashsms=0` +
-      `&number=${phone}` +
-      `&text=Escalation%20Alert:%20Washroom%20complaint%20unresolved%20for%2015%20minutes.%20ID:%20${complaintId}%20Washroom:%20${washroomName}%20Floor:%20${floor}%20Issue:%20${issue}%20Supervisor%20action%20pending.%20Immediate%20intervention%20required.%20MOVIEM` +
-      `&route=15` +
-      `&DLTTemplateId=1707177934207573791` +
-      `&PEID=1701160257275217983`
+  await Promise.all(
+    phoneList.map((phone) => {
+      const message =
+        `साउथ एवेन्यू मॉल एस्केलेशन: ` +
+        `शिकायत 15 मिनट से लंबित है। ` +
+        `आईडी: ${complaintId} ` +
+        `वॉशरूम: ${washroomName} ` +
+        `समस्या: ${issue} ` +
+        `डैशबोर्ड: ${dashboardUrl} ` +
+        `MOVIEM`
 
-    await callSms(url)
-  }
+      const url =
+        `${SMS_BASE}?user=moviem` +
+        `&password=Password@1` +
+        `&senderid=MOVIEM` +
+        `&channel=TRANS` +
+        `&DCS=8` +
+        `&flashsms=0` +
+        `&number=${phone}` +
+        `&text=${encodeURIComponent(
+          message
+        )}` +
+        `&route=6` +
+        `&DLTTemplateId=1707177953946867784` +
+        `&PEID=1701160257275217983`
+
+      return callSms(url)
+    })
+  )
 }
 
 export async function sendOwnerSMS(
   numbers: string,
   complaintId: string,
   washroomName: string,
-  floor: string,
-  issue: string
+  issue: string,
+  dashboardUrl: string
 ) {
   const phoneList =
     parseList(numbers)
 
-  for (const phone of phoneList) {
-    const url =
-      `${SMS_BASE}?user=moviem` +
-      `&password=Password@1` +
-      `&senderid=MOVIEM` +
-      `&channel=TRANS` +
-      `&DCS=0` +
-      `&flashsms=0` +
-      `&number=${phone}` +
-      `&text=Critical%20Alert:%20Washroom%20complaint%20unresolved%20for%2030%20minutes.%20ID:%20${complaintId}%20Washroom:%20${washroomName}%20Floor:%20${floor}%20Issue:%20${issue}%20GM%20escalation%20unsuccessful.%20Immediate%20management%20action%20required.%20MOVIEM` +
-      `&route=6` +
-      `&DLTTemplateId=1707177934222280533` +
-      `&PEID=1701160257275217983`
+  await Promise.all(
+    phoneList.map((phone) => {
+      const message =
+        `साउथ एवेन्यू मॉल क्रिटिकल अलर्ट: ` +
+        `शिकायत 30 मिनट से लंबित है। ` +
+        `आईडी: ${complaintId} ` +
+        `वॉशरूम: ${washroomName} ` +
+        `समस्या: ${issue} ` +
+        `डैशबोर्ड: ${dashboardUrl} ` +
+        `MOVIEM`
 
-    await callSms(url)
-  }
+      const url =
+        `${SMS_BASE}?user=moviem` +
+        `&password=Password@1` +
+        `&senderid=MOVIEM` +
+        `&channel=TRANS` +
+        `&DCS=8` +
+        `&flashsms=0` +
+        `&number=${phone}` +
+        `&text=${encodeURIComponent(
+          message
+        )}` +
+        `&route=6` +
+        `&DLTTemplateId=1707177953960434359` +
+        `&PEID=1701160257275217983`
+
+      return callSms(url)
+    })
+  )
 }
