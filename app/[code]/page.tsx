@@ -2,46 +2,29 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import FeedbackForm from "@/components/FeedbackForm"
+import { useRouter } from "next/navigation"
 
 export default function WashroomPage() {
   const params = useParams()
+  const router = useRouter()
   const code = params.code as string
 
-  const [washroom, setWashroom] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] =
+    useState(true)
 
   useEffect(() => {
-    async function loadWashroom() {
-      try {
-        const res = await fetch(`/api/washrooms/code/${code}`)
-
-        if (!res.ok) {
-          setWashroom(null)
-          return
-        }
-
-        const data = await res.json()
-        setWashroom(data)
-      } catch (error) {
-        console.error(error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     if (code) {
-      loadWashroom()
+      router.push(`/${code}`)
+    } else {
+      setLoading(false)
     }
-  }, [code])
+  }, [code, router])
 
-  if (loading) {
-    return <div>Loading...</div>
-  }
-
-  if (!washroom) {
-    return <div>Invalid washroom QR</div>
-  }
-
-  return <FeedbackForm washroom={washroom} />
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      {loading
+        ? "Loading..."
+        : "Invalid washroom QR"}
+    </div>
+  )
 }
