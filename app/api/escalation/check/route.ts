@@ -6,18 +6,15 @@ import {
   sendOwnerSMS,
 } from "@/lib/mailer"
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const now = new Date()
 
-    const origin =
-      new URL(req.url).origin
-
     const gmDashboardLink =
-      `${origin}/dashboard/gm`
+      "https://feedback.southavenuemall.com/dashboard/gm"
 
     const ownerDashboardLink =
-      `${origin}/dashboard/owner`
+      "https://feedback.southavenuemall.com/dashboard/owner"
 
     const complaints =
       await prisma.complaint.findMany({
@@ -138,8 +135,7 @@ export async function GET(req: Request) {
           complaint.complaintId,
           complaint.washroomName,
           complaint.issueDescription ||
-            "No details",
-          gmDashboardLink
+            "No details"
         )
 
         await prisma.complaint.update({
@@ -227,8 +223,7 @@ export async function GET(req: Request) {
           complaint.complaintId,
           complaint.washroomName,
           complaint.issueDescription ||
-            "No details",
-          ownerDashboardLink
+            "No details"
         )
 
         await prisma.complaint.update({

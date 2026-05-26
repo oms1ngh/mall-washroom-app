@@ -3,6 +3,9 @@ import nodemailer from "nodemailer"
 const SMS_BASE =
   "http://sms.heightsconsultancy.com/api/mt/SendSMS"
 
+const APP_BASE_URL =
+  "https://feedback.southavenuemall.com"
+
 function parseList(input?: string) {
   if (!input) return []
 
@@ -105,11 +108,13 @@ export async function sendSupervisorSMS(
   numbers: string,
   complaintId: string,
   washroomName: string,
-  issue: string,
-  dashboardUrl: string
+  issue: string
 ) {
   const phoneList =
     parseList(numbers)
+
+  const dashboardUrl =
+    `${APP_BASE_URL}/dashboard/supervisor`
 
   await Promise.all(
     phoneList.map((phone) => {
@@ -147,11 +152,13 @@ export async function sendGMSMS(
   numbers: string,
   complaintId: string,
   washroomName: string,
-  issue: string,
-  dashboardUrl: string
+  issue: string
 ) {
   const phoneList =
     parseList(numbers)
+
+  const dashboardUrl =
+    `${APP_BASE_URL}/dashboard/gm`
 
   await Promise.all(
     phoneList.map((phone) => {
@@ -188,11 +195,13 @@ export async function sendOwnerSMS(
   numbers: string,
   complaintId: string,
   washroomName: string,
-  issue: string,
-  dashboardUrl: string
+  issue: string
 ) {
   const phoneList =
     parseList(numbers)
+
+  const dashboardUrl =
+    `${APP_BASE_URL}/dashboard/owner`
 
   await Promise.all(
     phoneList.map((phone) => {

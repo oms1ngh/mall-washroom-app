@@ -11,11 +11,8 @@ export async function POST(req: Request) {
 
     console.log("Incoming:", body)
 
-    const origin =
-      new URL(req.url).origin
-
     const supervisorDashboardLink =
-      `${origin}/dashboard/supervisor`
+      "https://feedback.southavenuemall.com/dashboard/supervisor"
 
     const washroom =
       await prisma.washroom.findUnique({
@@ -197,8 +194,7 @@ export async function POST(req: Request) {
         complaint.complaintId,
         complaint.washroomName,
         complaint.issueDescription ||
-          "No details",
-        supervisorDashboardLink
+          "No details"
       )
     }
 
