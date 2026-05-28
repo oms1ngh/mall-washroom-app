@@ -3,8 +3,8 @@ import nodemailer from "nodemailer"
 const SMS_BASE =
   "http://sms.heightsconsultancy.com/api/mt/SendSMS"
 
-const APP_BASE_URL =
-  "https://feedback.southavenuemall.com"
+const LOGIN_URL =
+  "https://feedback.southavenuemall.com/login"
 
 function parseList(input?: string) {
   if (!input) return []
@@ -13,6 +13,19 @@ function parseList(input?: string) {
     .split(/[\n,]+/)
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function formatTime(date?: Date) {
+  return new Date(
+    date || new Date()
+  ).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  })
 }
 
 export async function sendEmail({
@@ -100,6 +113,7 @@ async function callSms(url: string) {
       "SMS ERROR:",
       error
     )
+
     return false
   }
 }
@@ -108,24 +122,24 @@ export async function sendSupervisorSMS(
   numbers: string,
   complaintId: string,
   washroomName: string,
-  issue: string
+  issue: string,
+  createdAt?: Date
 ) {
   const phoneList =
     parseList(numbers)
 
-  const dashboardUrl =
-    `${APP_BASE_URL}/dashboard/supervisor`
+  const time =
+    formatTime(createdAt)
 
   await Promise.all(
     phoneList.map((phone) => {
       const message =
-        `साउथ एवेन्यू मॉल अलर्ट: ` +
-        `नई वॉशरूम शिकायत प्राप्त हुई। ` +
+        `SAM: नई वॉशरूम शिकायत। ` +
         `आईडी: ${complaintId} ` +
         `वॉशरूम: ${washroomName} ` +
-        `समस्या: ${issue} ` +
-        `15 मिनट में समाधान करें। ` +
-        `कृपया लॉगिन करके शिकायत का समाधान करें: ${dashboardUrl} ` +
+        `समय: ${time} ` +
+        `विवरण: ${issue} ` +
+        `लॉगिन: ${LOGIN_URL} ` +
         `MOVIEM`
 
       const url =
@@ -140,7 +154,7 @@ export async function sendSupervisorSMS(
           message
         )}` +
         `&route=6` +
-        `&DLTTemplateId=1707177953899344364` +
+        `&DLTTemplateId=1707177986992911673` +
         `&PEID=1701160257275217983`
 
       return callSms(url)
@@ -152,23 +166,24 @@ export async function sendGMSMS(
   numbers: string,
   complaintId: string,
   washroomName: string,
-  issue: string
+  issue: string,
+  createdAt?: Date
 ) {
   const phoneList =
     parseList(numbers)
 
-  const dashboardUrl =
-    `${APP_BASE_URL}/dashboard/gm`
+  const time =
+    formatTime(createdAt)
 
   await Promise.all(
     phoneList.map((phone) => {
       const message =
-        `साउथ एवेन्यू मॉल एस्केलेशन: ` +
-        `शिकायत 15 मिनट से लंबित है। ` +
+        `SAM: शिकायत 15 मिनट से लंबित। ` +
         `आईडी: ${complaintId} ` +
         `वॉशरूम: ${washroomName} ` +
-        `समस्या: ${issue} ` +
-        `डैशबोर्ड: ${dashboardUrl} ` +
+        `समय: ${time} ` +
+        `विवरण: ${issue} ` +
+        `लॉगिन: ${LOGIN_URL} ` +
         `MOVIEM`
 
       const url =
@@ -183,7 +198,7 @@ export async function sendGMSMS(
           message
         )}` +
         `&route=6` +
-        `&DLTTemplateId=1707177953946867784` +
+        `&DLTTemplateId=1707177987004642664` +
         `&PEID=1701160257275217983`
 
       return callSms(url)
@@ -195,23 +210,24 @@ export async function sendOwnerSMS(
   numbers: string,
   complaintId: string,
   washroomName: string,
-  issue: string
+  issue: string,
+  createdAt?: Date
 ) {
   const phoneList =
     parseList(numbers)
 
-  const dashboardUrl =
-    `${APP_BASE_URL}/dashboard/owner`
+  const time =
+    formatTime(createdAt)
 
   await Promise.all(
     phoneList.map((phone) => {
       const message =
-        `साउथ एवेन्यू मॉल क्रिटिकल अलर्ट: ` +
-        `शिकायत 30 मिनट से लंबित है। ` +
+        `SAM क्रिटिकल अलर्ट: शिकायत 30 मिनट से लंबित। ` +
         `आईडी: ${complaintId} ` +
         `वॉशरूम: ${washroomName} ` +
-        `समस्या: ${issue} ` +
-        `डैशबोर्ड: ${dashboardUrl} ` +
+        `समय: ${time} ` +
+        `विवरण: ${issue} ` +
+        `लॉगिन: ${LOGIN_URL} ` +
         `MOVIEM`
 
       const url =
@@ -226,7 +242,7 @@ export async function sendOwnerSMS(
           message
         )}` +
         `&route=6` +
-        `&DLTTemplateId=1707177953960434359` +
+        `&DLTTemplateId=1707177987015025665` +
         `&PEID=1701160257275217983`
 
       return callSms(url)

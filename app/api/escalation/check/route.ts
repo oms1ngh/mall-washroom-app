@@ -135,7 +135,8 @@ export async function GET() {
           complaint.complaintId,
           complaint.washroomName,
           complaint.issueDescription ||
-            "No details"
+            "No details",
+          complaint.createdAt
         )
 
         await prisma.complaint.update({
@@ -223,7 +224,8 @@ export async function GET() {
           complaint.complaintId,
           complaint.washroomName,
           complaint.issueDescription ||
-            "No details"
+            "No details",
+          complaint.createdAt
         )
 
         await prisma.complaint.update({
