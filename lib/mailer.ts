@@ -135,28 +135,25 @@ export async function sendSupervisorSMS(
   await Promise.all(
     phoneList.map((phone) => {
       const message =
-        `SAM: नई वॉशरूम शिकायत। ` +
-        `आईडी: ${complaintId} ` +
-        `वॉशरूम: ${washroomName} ` +
-        `समय: ${time} ` +
-        `विवरण: ${issue} ` +
-        `लॉगिन: ${LOGIN_URL} ` +
-        `MOVIEM`
+  `SAM: नई वॉशरूम शिकायत। ` +
+  `आईडी: ${complaintId} ` +
+  `वॉशरूम: ${washroomName} ` +
+  `समय: ${time} ` +
+  `विवरण: ${issue} ` +
+  `लॉगिन: ${LOGIN_URL}`
 
       const url =
-        `${SMS_BASE}?user=moviem` +
-        `&password=Password@1` +
-        `&senderid=MOVIEM` +
-        `&channel=TRANS` +
-        `&DCS=8` +
-        `&flashsms=0` +
-        `&number=${phone}` +
-        `&text=${encodeURIComponent(
-          message
-        )}` +
-        `&route=6` +
-        `&DLTTemplateId=1707177986992911673` +
-        `&PEID=1701160257275217983`
+  `${SMS_BASE}?user=JECSAM` +
+  `&password=Password` +
+  `&senderid=JECSAM` +
+  `&channel=TRANS` +
+  `&DCS=8` +
+  `&flashsms=0` +
+  `&number=${phone}` +
+  `&text=${encodeURIComponent(message)}` +
+  `&route=6` +
+  `&DLTTemplateId=1707178012827288834` +
+  `&PEID=1701160257275217983`
 
       return callSms(url)
     })
@@ -179,28 +176,25 @@ export async function sendGMSMS(
   await Promise.all(
     phoneList.map((phone) => {
       const message =
-        `SAM: शिकायत 15 मिनट से लंबित। ` +
-        `आईडी: ${complaintId} ` +
-        `वॉशरूम: ${washroomName} ` +
-        `समय: ${time} ` +
-        `विवरण: ${issue} ` +
-        `लॉगिन: ${LOGIN_URL} ` +
-        `MOVIEM`
+  `SAM: शिकायत 15 मिनट से लंबित। ` +
+  `आईडी: ${complaintId} ` +
+  `वॉशरूम: ${washroomName} ` +
+  `समय: ${time} ` +
+  `विवरण: ${issue} ` +
+  `लॉगिन: ${LOGIN_URL}`
 
       const url =
-        `${SMS_BASE}?user=moviem` +
-        `&password=Password@1` +
-        `&senderid=MOVIEM` +
-        `&channel=TRANS` +
-        `&DCS=8` +
-        `&flashsms=0` +
-        `&number=${phone}` +
-        `&text=${encodeURIComponent(
-          message
-        )}` +
-        `&route=6` +
-        `&DLTTemplateId=1707177987004642664` +
-        `&PEID=1701160257275217983`
+  `${SMS_BASE}?user=JECSAM` +
+  `&password=Password` +
+  `&senderid=JECSAM` +
+  `&channel=TRANS` +
+  `&DCS=8` +
+  `&flashsms=0` +
+  `&number=${phone}` +
+  `&text=${encodeURIComponent(message)}` +
+  `&route=6` +
+  `&DLTTemplateId=1707178012839878373` +
+  `&PEID=1701160257275217983`
 
       return callSms(url)
     })
@@ -223,28 +217,25 @@ export async function sendOwnerSMS(
   await Promise.all(
     phoneList.map((phone) => {
       const message =
-        `SAM क्रिटिकल अलर्ट: शिकायत 30 मिनट से लंबित। ` +
-        `आईडी: ${complaintId} ` +
-        `वॉशरूम: ${washroomName} ` +
-        `समय: ${time} ` +
-        `विवरण: ${issue} ` +
-        `लॉगिन: ${LOGIN_URL} ` +
-        `MOVIEM`
+  `SAM क्रिटिकल अलर्ट: शिकायत 30 मिनट से लंबित। ` +
+  `आईडी: ${complaintId} ` +
+  `वॉशरूम: ${washroomName} ` +
+  `समय: ${time} ` +
+  `विवरण: ${issue} ` +
+  `लॉगिन: ${LOGIN_URL}`
 
       const url =
-        `${SMS_BASE}?user=moviem` +
-        `&password=Password@1` +
-        `&senderid=MOVIEM` +
-        `&channel=TRANS` +
-        `&DCS=8` +
-        `&flashsms=0` +
-        `&number=${phone}` +
-        `&text=${encodeURIComponent(
-          message
-        )}` +
-        `&route=6` +
-        `&DLTTemplateId=1707177987015025665` +
-        `&PEID=1701160257275217983`
+  `${SMS_BASE}?user=JECSAM` +
+  `&password=Password` +
+  `&senderid=JECSAM` +
+  `&channel=TRANS` +
+  `&DCS=8` +
+  `&flashsms=0` +
+  `&number=${phone}` +
+  `&text=${encodeURIComponent(message)}` +
+  `&route=6` +
+  `&DLTTemplateId=1707178012847575315` +
+  `&PEID=1701160257275217983`
 
       return callSms(url)
     })

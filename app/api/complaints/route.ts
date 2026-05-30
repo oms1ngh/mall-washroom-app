@@ -128,75 +128,99 @@ export async function POST(req: Request) {
           .join(",")
 
       sendEmail({
-        to: supervisorEmails,
-        subject:
-          "South Avenue Mall Service Notification",
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>
-              South Avenue Mall Service Notification
-            </h2>
+  to: supervisorEmails,
 
-            <p>
-              A new washroom service request has been recorded.
-            </p>
+  subject:
+    `South Avenue Mall - नई वॉशरूम शिकायत | ${complaint.complaintId}`,
 
-            <p>
-              <strong>Complaint ID:</strong>
-              ${complaint.complaintId}
-            </p>
+  html: `
+    <div style="font-family: Arial, sans-serif; padding:20px;">
+      <h2 style="color:#dc2626;">
+        South Avenue Mall - नई वॉशरूम शिकायत
+      </h2>
 
-            <p>
-              <strong>Washroom:</strong>
-              ${complaint.washroomName}
-            </p>
+      <p>
+        वॉशरूम से नई शिकायत प्राप्त हुई है।
+      </p>
 
-            <p>
-              <strong>Cleanliness:</strong>
-              ${complaint.cleanlinessStatus}
-            </p>
+      <p>
+        <strong>शिकायत आईडी:</strong>
+        ${complaint.complaintId}
+      </p>
 
-            <p>
-              <strong>Facilities Working:</strong>
-              ${
-                complaint.facilitiesWorking
-                  ? "Yes"
-                  : "No"
-              }
-            </p>
+      <p>
+        <strong>वॉशरूम:</strong>
+        ${complaint.washroomName}
+      </p>
 
-            <p>
-              <strong>Issue:</strong>
-              ${
-                complaint.issueDescription ||
-                "No details"
-              }
-            </p>
+      <p>
+        <strong>समय:</strong>
+        ${complaint.createdAt.toLocaleString(
+          "en-IN",
+          {
+            timeZone: "Asia/Kolkata",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          }
+        )}
+      </p>
 
-            <p>
-              <strong>Dashboard:</strong>
-              <a href="${supervisorDashboardLink}">
-                ${supervisorDashboardLink}
-              </a>
-            </p>
+      <p>
+        <strong>स्वच्छता स्थिति:</strong>
+        ${complaint.cleanlinessStatus}
+      </p>
 
-            <hr />
+      <p>
+        <strong>सुविधाएं कार्यरत:</strong>
+        ${
+          complaint.facilitiesWorking
+            ? "हाँ"
+            : "नहीं"
+        }
+      </p>
 
-            <p style="color:red; font-weight:bold;">
-              Please resolve within 15 minutes.
-            </p>
-          </div>
-        `,
-      })
+      <p>
+        <strong>विवरण:</strong>
+        ${
+          complaint.issueDescription ||
+          "कोई विवरण उपलब्ध नहीं"
+        }
+      </p>
+
+      <p>
+        <strong>लॉगिन:</strong><br/>
+        <a href="https://feedback.southavenuemall.com/login">
+          https://feedback.southavenuemall.com/login
+        </a>
+      </p>
+
+      <p>
+        कृपया लॉगिन करके शिकायत का समाधान करें।
+      </p>
+
+      <hr/>
+
+      <p style="color:red;font-weight:bold;">
+        कृपया 15 मिनट के भीतर शिकायत का समाधान करें।
+        15 मिनट के बाद शिकायत स्वतः GM को एस्केलेट हो जाएगी।
+      </p>
+    </div>
+  `,
+})
 
       sendSupervisorSMS(
-        supervisorPhones,
-        complaint.complaintId,
-        complaint.washroomName,
-        complaint.issueDescription ||
-          "No details"
-      )
-    }
+  supervisorPhones,
+  complaint.complaintId,
+  complaint.washroomName,
+  complaint.issueDescription ||
+    "No details",
+  complaint.createdAt
+)
+}
 
     return NextResponse.json({
       success: true,

@@ -4,9 +4,7 @@ import {
   useEffect,
   useState,
 } from "react"
-
 import { signOut } from "next-auth/react"
-import Image from "next/image"
 import * as XLSX from "xlsx"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -29,29 +27,24 @@ type Complaint = {
   } | null
 }
 
-type DashboardResponse = {
+type DashboardData = {
+  totalComplaints: number
+  negativeComplaints: number
+  positiveFeedbackCount: number
+  resolvedComplaints: number
+  escalatedToGM: number
+  escalatedToDirector: number
+  avgResolutionMinutes: number
   liveComplaints: Complaint[]
   escalatedComplaints: Complaint[]
   reportComplaints: Complaint[]
-
-  stats: {
-    totalComplaints: number
-    negativeComplaints: number
-    positiveFeedbackCount: number
-    openComplaints: number
-    resolvedComplaints: number
-    escalatedCount: number
-    criticalCount: number
-    avgResolutionMinutes: number
-  }
-
   washrooms: {
     id: number
     name: string
   }[]
 }
 
-function formatMinutes(
+function formatAvgTime(
   mins: number
 ) {
   if (!mins) return "0 mins"
@@ -60,52 +53,28 @@ function formatMinutes(
     return `${mins} mins`
   }
 
-  const hrs = Math.floor(mins / 60)
-  const remaining = mins % 60
+  const hrs = Math.floor(
+    mins / 60
+  )
+  const rem = mins % 60
 
-  if (remaining === 0) {
+  if (rem === 0) {
     return `${hrs} hr`
   }
 
-  return `${hrs} hr ${remaining} mins`
+  return `${hrs} hr ${rem} mins`
 }
 
 export default function GMDashboard() {
+  const [data, setData] =
+    useState<DashboardData | null>(
+      null
+    )
+
   const [activeTab, setActiveTab] =
-    useState("live")
-
-  const [liveComplaints, setLiveComplaints] =
-    useState<Complaint[]>([])
-
-  const [
-    escalatedComplaints,
-    setEscalatedComplaints,
-  ] = useState<Complaint[]>([])
-
-  const [
-    reportComplaints,
-    setReportComplaints,
-  ] = useState<Complaint[]>([])
-
-  const [washrooms, setWashrooms] =
     useState<
-      {
-        id: number
-        name: string
-      }[]
-    >([])
-
-  const [stats, setStats] =
-    useState({
-      totalComplaints: 0,
-      negativeComplaints: 0,
-      positiveFeedbackCount: 0,
-      openComplaints: 0,
-      resolvedComplaints: 0,
-      escalatedCount: 0,
-      criticalCount: 0,
-      avgResolutionMinutes: 0,
-    })
+      "live" | "escalated" | "report"
+    >("live")
 
   const [singleDate, setSingleDate] =
     useState("")
@@ -125,6 +94,9 @@ export default function GMDashboard() {
   ] = useState("")
 
   async function fetchDashboard() {
+    let url =
+      "/api/dashboard/gm"
+
     const params =
       new URLSearchParams()
 
@@ -140,7 +112,6 @@ export default function GMDashboard() {
         "from",
         fromDate
       )
-
       params.append("to", toDate)
     }
 
@@ -158,9 +129,12 @@ export default function GMDashboard() {
       )
     }
 
-    const res = await fetch(
-      `/api/dashboard/gm?${params.toString()}`
-    )
+    if (params.toString()) {
+      url +=
+        "?" + params.toString()
+    }
+
+    const res = await fetch(url)
 
     if (!res.ok) {
       throw new Error(
@@ -168,41 +142,34 @@ export default function GMDashboard() {
       )
     }
 
-    const data: DashboardResponse =
-      await res.json()
-
-    setLiveComplaints(
-      data.liveComplaints
-    )
-
-    setEscalatedComplaints(
-      data.escalatedComplaints
-    )
-
-    setReportComplaints(
-      data.reportComplaints
-    )
-
-    setStats(data.stats)
-    setWashrooms(data.washrooms)
+    const json = await res.json()
+    setData(json)
   }
 
-  function clearFilters() {
-  setSingleDate("")
-  setFromDate("")
-  setToDate("")
-  setStatusFilter("")
-  setWashroomFilter("")
-
-  setTimeout(() => {
+  useEffect(() => {
     fetchDashboard()
-  }, 100)
-}
+  }, [
+    singleDate,
+    fromDate,
+    toDate,
+    statusFilter,
+    washroomFilter,
+  ])
+
+  function clearFilters() {
+    setSingleDate("")
+    setFromDate("")
+    setToDate("")
+    setStatusFilter("")
+    setWashroomFilter("")
+  }
 
   function exportExcel() {
-    const worksheet =
-      XLSX.utils.json_to_sheet(
-        reportComplaints.map((c) => ({
+    if (!data) return
+
+    const rows =
+      data.reportComplaints.map(
+        (c) => ({
           ComplaintID:
             c.complaintId,
           Washroom:
@@ -221,290 +188,234 @@ export default function GMDashboard() {
             new Date(
               c.createdAt
             ).toLocaleString(),
-          Resolved:
-            c.resolvedAt
-              ? new Date(
-                  c.resolvedAt
-                ).toLocaleString()
-              : "-",
+          Resolved: c.resolvedAt
+            ? new Date(
+                c.resolvedAt
+              ).toLocaleString()
+            : "-",
           ResolutionTime:
             c.resolutionTime,
           ResolvedBy:
             c.resolvedBy?.name ||
             "-",
-        }))
+        })
       )
 
-    const workbook =
+    const ws =
+      XLSX.utils.json_to_sheet(
+        rows
+      )
+
+    const wb =
       XLSX.utils.book_new()
 
     XLSX.utils.book_append_sheet(
-      workbook,
-      worksheet,
+      wb,
+      ws,
       "GM Report"
     )
 
     XLSX.writeFile(
-      workbook,
+      wb,
       "gm-report.xlsx"
     )
   }
 
   function exportPDF() {
+    if (!data) return
+
     const doc = new jsPDF()
 
+    doc.text(
+      "GM Dashboard Report",
+      14,
+      15
+    )
+
     autoTable(doc, {
+      startY: 25,
       head: [
         [
-          "Complaint",
+          "Complaint ID",
           "Washroom",
           "Issue",
           "Status",
           "Created",
           "Resolved",
-          "Time",
+          "Resolution",
         ],
       ],
-
       body:
-        reportComplaints.map((c) => [
-          c.complaintId,
-          c.washroomName,
-          c.issueDescription ||
-            "No comment",
-          c.status,
-          new Date(
-            c.createdAt
-          ).toLocaleString(),
-          c.resolvedAt
-            ? new Date(
-                c.resolvedAt
-              ).toLocaleString()
-            : "-",
-          c.resolutionTime,
-        ]),
+        data.reportComplaints.map(
+          (c) => [
+            c.complaintId,
+            c.washroomName,
+            c.issueDescription ||
+              "No comment",
+            c.status,
+            new Date(
+              c.createdAt
+            ).toLocaleString(),
+            c.resolvedAt
+              ? new Date(
+                  c.resolvedAt
+                ).toLocaleString()
+              : "-",
+            c.resolutionTime,
+          ]
+        ),
     })
 
     doc.save("gm-report.pdf")
   }
 
-  useEffect(() => {
-  fetchDashboard()
-}, [
-  singleDate,
-  fromDate,
-  toDate,
-  statusFilter,
-  washroomFilter,
-])
+  if (!data) {
     return (
+      <div className="p-10">
+        Loading...
+      </div>
+    )
+  }
+
+  return (
     <div className="min-h-screen bg-slate-100">
-      <header className="bg-white border-b shadow-sm px-4 md:px-10 py-4 md:py-6 flex flex-col md:flex-row justify-between gap-4 md:items-center">
-        <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
-          <Image
-            src="/sam-logo.jpg"
-            alt="South Avenue Mall"
-            width={120}
-            height={60}
-            className="h-10 md:h-14 w-auto"
-          />
+      <header className="bg-white shadow px-8 py-5 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">
+            GM Dashboard
+          </h1>
 
-          <div>
-            <h1 className="text-2xl md:text-4xl font-bold text-slate-900">
-              GM Dashboard
-            </h1>
-
-            <p className="text-slate-600 text-sm md:text-xl">
-              South Avenue Mall Washroom Monitoring System
-            </p>
-          </div>
+          <p className="text-gray-500 mt-1">
+            South Avenue Mall
+          </p>
         </div>
 
-        <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6">
-          <span className="text-base md:text-xl">
-            Welcome, General Manager
-          </span>
-
-          <button
-            onClick={() =>
-              signOut({
-                callbackUrl:
-                  "/login",
-              })
-            }
-            className="bg-pink-600 text-white px-6 md:px-8 py-3 rounded-2xl font-bold w-full md:w-auto"
-          >
-            Logout
-          </button>
-        </div>
+        <button
+          onClick={() =>
+            signOut()
+          }
+          className="bg-red-600 text-white px-5 py-2 rounded-lg"
+        >
+          Logout
+        </button>
       </header>
 
-      <main className="p-4 md:p-10">
-        <div className="bg-white rounded-3xl shadow-lg p-6 mb-8">
-          <h2 className="text-2xl font-bold mb-6">
-            Filter Complaints
+      <main className="p-8">
+        <div className="bg-white rounded-2xl shadow p-6 mb-8">
+          <h2 className="text-xl font-bold mb-5">
+            Filters
           </h2>
 
-          <div className="grid md:grid-cols-6 gap-4">
-            <div>
-              <label className="block mb-2 font-semibold">
-                Single Date
-              </label>
-
-              <input
-                type="date"
-                value={singleDate}
-                onChange={(e) =>
-                  setSingleDate(
-                    e.target.value
-                  )
-                }
-                className="border p-3 rounded-xl w-full"
-              />
-            </div>
-
-            <button
-              onClick={
-                fetchDashboard
+          <div className="grid md:grid-cols-5 gap-4">
+            <input
+              type="date"
+              value={singleDate}
+              onChange={(e) =>
+                setSingleDate(
+                  e.target.value
+                )
               }
-              className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold mt-8"
-            >
-              Apply Date
-            </button>
+              className="border rounded-lg px-4 py-3"
+            />
 
-            <div>
-              <label className="block mb-2 font-semibold">
-                From Date
-              </label>
-
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) =>
-                  setFromDate(
-                    e.target.value
-                  )
-                }
-                className="border p-3 rounded-xl w-full"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-2 font-semibold">
-                To Date
-              </label>
-
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) =>
-                  setToDate(
-                    e.target.value
-                  )
-                }
-                className="border p-3 rounded-xl w-full"
-              />
-            </div>
-
-            <button
-              onClick={
-                fetchDashboard
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) =>
+                setFromDate(
+                  e.target.value
+                )
               }
-              className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold mt-8"
-            >
-              Apply Range
-            </button>
+              className="border rounded-lg px-4 py-3"
+            />
 
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) =>
+                setToDate(
+                  e.target.value
+                )
+              }
+              className="border rounded-lg px-4 py-3"
+            />
+
+            <select
+              value={
+                statusFilter
+              }
+              onChange={(e) =>
+                setStatusFilter(
+                  e.target.value
+                )
+              }
+              className="border rounded-lg px-4 py-3"
+            >
+              <option value="">
+                All Status
+              </option>
+              <option value="OPEN">
+                Open
+              </option>
+              <option value="RESOLVED">
+                Resolved
+              </option>
+              <option value="ESCALATED_TO_GM">
+                Escalated
+              </option>
+              <option value="CRITICAL">
+                Critical
+              </option>
+              <option value="POSITIVE_FEEDBACK">
+                Positive Feedback
+              </option>
+            </select>
+
+            <select
+              value={
+                washroomFilter
+              }
+              onChange={(e) =>
+                setWashroomFilter(
+                  e.target.value
+                )
+              }
+              className="border rounded-lg px-4 py-3"
+            >
+              <option value="">
+                All Washrooms
+              </option>
+
+              {data.washrooms.map(
+                (w) => (
+                  <option
+                    key={w.id}
+                    value={
+                      w.name
+                    }
+                  >
+                    {w.name}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+          <div className="flex gap-4 mt-5">
             <button
               onClick={
                 clearFilters
               }
-              className="bg-gray-600 text-white px-6 py-3 rounded-xl font-bold mt-8"
+              className="bg-gray-600 text-white px-5 py-2 rounded-lg"
             >
-              Clear
+              Clear Filters
             </button>
-          </div>
 
-          <div className="grid md:grid-cols-2 gap-4 mt-6">
-            <div>
-              <label className="block mb-2 font-semibold">
-                Status
-              </label>
-
-              <select
-                value={
-                  statusFilter
-                }
-                onChange={(e) =>
-                  setStatusFilter(
-                    e.target.value
-                  )
-                }
-                className="border p-3 rounded-xl w-full"
-              >
-                <option value="">
-                  All Status
-                </option>
-                <option value="OPEN">
-                  Open
-                </option>
-                <option value="RESOLVED">
-                  Resolved
-                </option>
-                <option value="ESCALATED_TO_GM">
-                  Escalated
-                </option>
-                <option value="CRITICAL">
-                  Critical
-                </option>
-                <option value="POSITIVE_FEEDBACK">
-                  Positive Feedback
-                </option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block mb-2 font-semibold">
-                Washroom
-              </label>
-
-              <select
-                value={
-                  washroomFilter
-                }
-                onChange={(e) =>
-                  setWashroomFilter(
-                    e.target.value
-                  )
-                }
-                className="border p-3 rounded-xl w-full"
-              >
-                <option value="">
-                  All Washrooms
-                </option>
-
-                {washrooms.map(
-                  (w) => (
-                    <option
-                      key={w.id}
-                      value={
-                        w.name
-                      }
-                    >
-                      {w.name}
-                    </option>
-                  )
-                )}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4 mt-6">
             <button
               onClick={
                 exportExcel
               }
-              className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold"
+              className="bg-green-600 text-white px-5 py-2 rounded-lg"
             >
               Export Excel
             </button>
@@ -513,18 +424,78 @@ export default function GMDashboard() {
               onClick={
                 exportPDF
               }
-              className="bg-red-600 text-white px-6 py-4 rounded-2xl font-bold"
+              className="bg-blue-600 text-white px-5 py-2 rounded-lg"
             >
               Export PDF
             </button>
           </div>
         </div>
-                <div className="flex flex-wrap gap-4 mb-8">
+
+        <div className="grid md:grid-cols-5 gap-6 mb-8">
+          <div className="bg-blue-600 text-white rounded-2xl p-6 shadow">
+            <p>Total Complaints</p>
+            <h3 className="text-3xl font-bold mt-2">
+              {
+                data.totalComplaints
+              }
+            </h3>
+            <p className="text-sm mt-2">
+              Negative:{" "}
+              {
+                data.negativeComplaints
+              }
+            </p>
+            <p className="text-sm">
+              Positive:{" "}
+              {
+                data.positiveFeedbackCount
+              }
+            </p>
+          </div>
+
+          <div className="bg-green-600 text-white rounded-2xl p-6 shadow">
+            <p>Resolved</p>
+            <h3 className="text-3xl font-bold mt-2">
+              {
+                data.resolvedComplaints
+              }
+            </h3>
+          </div>
+
+          <div className="bg-orange-600 text-white rounded-2xl p-6 shadow">
+            <p>Escalated</p>
+            <h3 className="text-3xl font-bold mt-2">
+              {
+                data.escalatedToGM
+              }
+            </h3>
+          </div>
+
+          <div className="bg-red-600 text-white rounded-2xl p-6 shadow">
+            <p>Critical</p>
+            <h3 className="text-3xl font-bold mt-2">
+              {
+                data.escalatedToDirector
+              }
+            </h3>
+          </div>
+
+          <div className="bg-purple-600 text-white rounded-2xl p-6 shadow">
+            <p>Avg Resolution</p>
+            <h3 className="text-2xl font-bold mt-2">
+              {formatAvgTime(
+                data.avgResolutionMinutes
+              )}
+            </h3>
+          </div>
+        </div>
+
+        <div className="flex gap-4 mb-8">
           <button
             onClick={() =>
               setActiveTab("live")
             }
-            className={`px-6 py-3 rounded-2xl font-bold ${
+            className={`px-5 py-2 rounded-lg ${
               activeTab === "live"
                 ? "bg-blue-600 text-white"
                 : "bg-white border"
@@ -539,7 +510,7 @@ export default function GMDashboard() {
                 "escalated"
               )
             }
-            className={`px-6 py-3 rounded-2xl font-bold ${
+            className={`px-5 py-2 rounded-lg ${
               activeTab ===
               "escalated"
                 ? "bg-orange-600 text-white"
@@ -553,7 +524,7 @@ export default function GMDashboard() {
             onClick={() =>
               setActiveTab("report")
             }
-            className={`px-6 py-3 rounded-2xl font-bold ${
+            className={`px-5 py-2 rounded-lg ${
               activeTab === "report"
                 ? "bg-purple-600 text-white"
                 : "bg-white border"
@@ -562,118 +533,38 @@ export default function GMDashboard() {
             Reports
           </button>
         </div>
-
-        <div className="grid md:grid-cols-5 gap-6 mb-8">
-          <div className="bg-blue-600 text-white rounded-3xl p-6 shadow-lg">
-            <p className="text-lg">
-              Total Complaints
-            </p>
-
-            <h3 className="text-4xl font-bold mt-2">
-              {
-                stats.totalComplaints
-              }
-            </h3>
-
-            <p className="mt-3 text-sm">
-              Negative:{" "}
-              {
-                stats.negativeComplaints
-              }
-            </p>
-
-            <p className="text-sm">
-              Positive:{" "}
-              {
-                stats.positiveFeedbackCount
-              }
-            </p>
-          </div>
-
-          <div className="bg-green-600 text-white rounded-3xl p-6 shadow-lg">
-            <p className="text-lg">
-              Resolved
-            </p>
-
-            <h3 className="text-4xl font-bold mt-2">
-              {
-                stats.resolvedComplaints
-              }
-            </h3>
-          </div>
-
-          <div className="bg-orange-600 text-white rounded-3xl p-6 shadow-lg">
-            <p className="text-lg">
-              Escalated to GM
-            </p>
-
-            <h3 className="text-4xl font-bold mt-2">
-              {
-                stats.escalatedCount
-              }
-            </h3>
-          </div>
-
-          <div className="bg-red-600 text-white rounded-3xl p-6 shadow-lg">
-            <p className="text-lg">
-              Critical
-            </p>
-
-            <h3 className="text-4xl font-bold mt-2">
-              {
-                stats.criticalCount
-              }
-            </h3>
-          </div>
-
-          <div className="bg-purple-600 text-white rounded-3xl p-6 shadow-lg">
-            <p className="text-lg">
-              Avg Resolution
-            </p>
-
-            <h3 className="text-3xl font-bold mt-2">
-              {formatMinutes(
-                stats.avgResolutionMinutes
-              )}
-            </h3>
-          </div>
-        </div>
-
-        {activeTab ===
-          "live" && (
-          <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
+                {activeTab === "live" && (
+          <div className="bg-white rounded-2xl shadow overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-200">
-  <tr>
-    <th className="p-4 text-left">
-      Complaint ID
-    </th>
-
-    <th className="p-4 text-left">
-      Washroom
-    </th>
-
-    <th className="p-4 text-left">
-      Issue
-    </th>
-
-    <th className="p-4 text-left">
-      Status
-    </th>
-
-    <th className="p-4 text-left">
-      Created
-    </th>
-
-    <th className="p-4 text-left">
-      Resolution Time
-    </th>
-  </tr>
-</thead>
+                  <tr>
+                    <th className="p-4 text-left">
+                      Complaint ID
+                    </th>
+                    <th className="p-4 text-left">
+                      Washroom
+                    </th>
+                    <th className="p-4 text-left">
+                      Issue
+                    </th>
+                    <th className="p-4 text-left">
+                      Status
+                    </th>
+                    <th className="p-4 text-left">
+                      Created
+                    </th>
+                    <th className="p-4 text-left">
+                      Escalation
+                    </th>
+                    <th className="p-4 text-left">
+                      Time Left
+                    </th>
+                  </tr>
+                </thead>
 
                 <tbody>
-                  {liveComplaints.map(
+                  {data.liveComplaints.map(
                     (c) => (
                       <tr
                         key={c.id}
@@ -702,7 +593,7 @@ export default function GMDashboard() {
 
                         <td className="p-4">
                           {new Date(
-                          c.createdAt
+                            c.createdAt
                           ).toLocaleString()}
                         </td>
 
@@ -726,7 +617,7 @@ export default function GMDashboard() {
 
         {activeTab ===
           "escalated" && (
-          <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
+          <div className="bg-white rounded-2xl shadow overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-200">
@@ -744,13 +635,16 @@ export default function GMDashboard() {
                       Status
                     </th>
                     <th className="p-4 text-left">
-                      Resolution
+                      Created
+                    </th>
+                    <th className="p-4 text-left">
+                      Resolution Time
                     </th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {escalatedComplaints.map(
+                  {data.escalatedComplaints.map(
                     (c) => (
                       <tr
                         key={c.id}
@@ -776,12 +670,12 @@ export default function GMDashboard() {
                         <td className="p-4">
                           {c.status}
                         </td>
-                        
+
                         <td className="p-4">
-  {new Date(
-    c.createdAt
-  ).toLocaleString()}
-</td>
+                          {new Date(
+                            c.createdAt
+                          ).toLocaleString()}
+                        </td>
 
                         <td className="p-4">
                           {
@@ -796,9 +690,9 @@ export default function GMDashboard() {
             </div>
           </div>
         )}
-                {activeTab ===
-          "report" && (
-          <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
+
+              {activeTab === "report" && (
+          <div className="bg-white rounded-2xl shadow overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-200">
@@ -837,7 +731,7 @@ export default function GMDashboard() {
                 </thead>
 
                 <tbody>
-                  {reportComplaints.map(
+                  {data.reportComplaints.map(
                     (c) => (
                       <tr
                         key={c.id}
@@ -912,7 +806,7 @@ export default function GMDashboard() {
             </div>
           </div>
         )}
-      </main>
+              </main>
     </div>
   )
 }
