@@ -314,41 +314,46 @@ export async function GET(req: Request) {
           c.ownerNotified
       )
 
-    return NextResponse.json({
-      liveComplaints,
+return NextResponse.json({
+  liveComplaints,
 
-      escalatedComplaints,
+  escalatedComplaints,
 
-      reportComplaints:
-        complaints,
+  reportComplaints:
+    complaints,
 
-      stats: {
-        totalComplaints:
-          complaints.length,
+  stats: {
+    totalComplaints:
+      complaints.length,
 
-        negativeComplaints:
-          complaints.length -
-          positiveFeedbackCount,
+    negativeComplaints:
+      complaints.length -
+      positiveFeedbackCount,
 
-        positiveFeedbackCount,
+    positiveFeedbackCount,
 
-        openComplaints,
+    openComplaints,
 
-        resolvedComplaints,
+    resolvedComplaints,
 
-        escalatedCount,
+    escalatedCount,
 
-        criticalCount,
+    criticalCount,
 
-        avgResolutionMinutes,
-      },
+    avgResolutionMinutes,
+  },
 
-      washrooms:
-        assignments.map((a) => ({
-          id: a.washroom.id,
-          name: a.washroom.name,
-        })),
-    })
+  
+washrooms:
+  assignments.map((a) => ({
+    id: a.washroom.id,
+    name: a.washroom.name,
+  })),
+
+
+})
+
+        
   } catch (error) {
     console.error(
       "GM DASHBOARD ERROR:",

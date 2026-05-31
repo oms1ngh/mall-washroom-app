@@ -35,22 +35,36 @@ export async function GET() {
         1000 /
         60
 
-      const assignment =
-        await prisma.washroomAssignment.findUnique(
-          {
-            where: {
-              washroomId:
-                complaint.washroomId,
-            },
-            include: {
-              generalManager: true,
-            },
-          }
-        )
+const assignments =
+  await prisma.washroomAssignment.findMany(
+    {
+      where: {
+        washroomId:
+          complaint.washroomId,
+      },
 
-      if (!assignment) {
-        continue
-      }
+      include: {
+        generalManager: true,
+      },
+    }
+  )
+
+if (
+  assignments.length === 0
+) {
+  continue
+}
+
+
+
+      
+if (
+  assignments.length === 0
+) {
+  continue
+}
+
+
 
       /*
       GM ESCALATION
@@ -60,75 +74,123 @@ export async function GET() {
         !complaint.gmNotified &&
         diffMinutes >= 15
       ) {
-        const gmEmails =
-          [
-            assignment.generalManager
-              ?.email,
-            assignment.gmExtraEmails,
-          ]
-            .filter(Boolean)
-            .join(",")
+       
+const uniqueGMEmails =
+  [
+    ...new Set(
+      assignments.flatMap((a) =>
+        [
+          a.generalManager
+            ?.email,
 
-        const gmPhones =
-          [
-            assignment.generalManager
-              ?.phone,
-            assignment.gmExtraPhones,
-          ]
-            .filter(Boolean)
-            .join(",")
+          a.gmExtraEmails,
+        ].filter(Boolean)
+      )
+    ),
+  ]
 
-        console.log(
-          "GM EMAILS:",
-          gmEmails
-        )
+const uniqueGMPhones =
+  [
+    ...new Set(
+      assignments.flatMap((a) =>
+        [
+          a.generalManager
+            ?.phone,
 
-        console.log(
-          "GM PHONES:",
-          gmPhones
-        )
+          a.gmExtraPhones,
+        ].filter(Boolean)
+      )
+    ),
+  ]
+
+const gmEmails =
+  uniqueGMEmails.join(",")
+
+const gmPhones =
+  uniqueGMPhones.join(",")
+
+console.log(
+  "GM EMAILS:",
+  gmEmails
+)
+
+console.log(
+  "GM PHONES:",
+  gmPhones
+)
+
+
 
         await sendEmail({
-          to: gmEmails,
-          subject:
-            "GM Escalation - Washroom Complaint Pending",
-          html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px;">
-              <h2 style="color:red;">
-                GM Escalation Alert
-              </h2>
+  to: gmEmails,
 
-              <p>
-                Complaint unresolved for 15 minutes.
-              </p>
+  subject:
+    `South Avenue Mall - शिकायत एस्केलेशन | ${complaint.complaintId}`,
 
-              <p>
-                <strong>ID:</strong>
-                ${complaint.complaintId}
-              </p>
+  html: `
+    <div style="font-family: Arial, sans-serif; padding:20px;">
+      <h2 style="color:#ea580c;">
+        South Avenue Mall - शिकायत एस्केलेशन सूचना
+      </h2>
 
-              <p>
-                <strong>Washroom:</strong>
-                ${complaint.washroomName}
-              </p>
+      <p>
+        यह शिकायत पिछले 15 मिनट से लंबित है और अब GM स्तर पर एस्केलेट की गई है।
+      </p>
 
-              <p>
-                <strong>Issue:</strong>
-                ${
-                  complaint.issueDescription ||
-                  "No details"
-                }
-              </p>
+      <p>
+        <strong>शिकायत आईडी:</strong>
+        ${complaint.complaintId}
+      </p>
 
-              <p>
-                <strong>Dashboard:</strong>
-                <a href="${gmDashboardLink}">
-                  ${gmDashboardLink}
-                </a>
-              </p>
-            </div>
-          `,
-        })
+      <p>
+        <strong>वॉशरूम:</strong>
+        ${complaint.washroomName}
+      </p>
+
+      <p>
+        <strong>समय:</strong>
+        ${complaint.createdAt.toLocaleString(
+          "en-IN",
+          {
+            timeZone: "Asia/Kolkata",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          }
+        )}
+      </p>
+
+      <p>
+        <strong>विवरण:</strong>
+        ${
+          complaint.issueDescription ||
+          "कोई विवरण उपलब्ध नहीं"
+        }
+      </p>
+
+      <p>
+        <strong>लॉगिन:</strong><br/>
+        <a href="https://feedback.southavenuemall.com/login">
+          https://feedback.southavenuemall.com/login
+        </a>
+      </p>
+
+      <p>
+        कृपया लॉगिन करके शिकायत पर आवश्यक कार्रवाई करें।
+      </p>
+
+      <hr/>
+
+      <p style="color:#ea580c;font-weight:bold;">
+        यदि अगले 15 मिनट में शिकायत का समाधान नहीं हुआ,
+        तो यह शिकायत Owner स्तर पर एस्केलेट हो जाएगी।
+      </p>
+    </div>
+  `,
+})
 
         await sendGMSMS(
           gmPhones,
@@ -161,11 +223,42 @@ export async function GET() {
         !complaint.ownerNotified &&
         diffMinutes >= 30
       ) {
-        const ownerEmails =
-          assignment.ownerEmails || ""
+       
+const uniqueOwnerEmails =
+  [
+    ...new Set(
+      assignments.flatMap((a) =>
+        (
+          a.ownerEmails || ""
+        )
+          .split(",")
+          .map((e) => e.trim())
+          .filter(Boolean)
+      )
+    ),
+  ]
 
-        const ownerPhones =
-          assignment.ownerPhones || ""
+const uniqueOwnerPhones =
+  [
+    ...new Set(
+      assignments.flatMap((a) =>
+        (
+          a.ownerPhones || ""
+        )
+          .split(",")
+          .map((p) => p.trim())
+          .filter(Boolean)
+      )
+    ),
+  ]
+
+const ownerEmails =
+  uniqueOwnerEmails.join(",")
+
+const ownerPhones =
+  uniqueOwnerPhones.join(",")
+
+
 
         console.log(
           "OWNER EMAILS:",
@@ -178,46 +271,74 @@ export async function GET() {
         )
 
         await sendEmail({
-          to: ownerEmails,
-          subject:
-            "Critical Escalation - Washroom Complaint Pending",
-          html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px;">
-              <h2 style="color:red;">
-                Critical Escalation Alert
-              </h2>
+  to: ownerEmails,
 
-              <p>
-                Complaint unresolved for 30 minutes.
-              </p>
+  subject:
+    `South Avenue Mall - क्रिटिकल शिकायत अलर्ट | ${complaint.complaintId}`,
 
-              <p>
-                <strong>ID:</strong>
-                ${complaint.complaintId}
-              </p>
+  html: `
+    <div style="font-family: Arial, sans-serif; padding:20px;">
+      <h2 style="color:#b91c1c;">
+        South Avenue Mall - क्रिटिकल शिकायत अलर्ट
+      </h2>
 
-              <p>
-                <strong>Washroom:</strong>
-                ${complaint.washroomName}
-              </p>
+      <p>
+        यह शिकायत 30 मिनट से अधिक समय से लंबित है और अब Owner स्तर पर एस्केलेट हो चुकी है।
+      </p>
 
-              <p>
-                <strong>Issue:</strong>
-                ${
-                  complaint.issueDescription ||
-                  "No details"
-                }
-              </p>
+      <p>
+        <strong>शिकायत आईडी:</strong>
+        ${complaint.complaintId}
+      </p>
 
-              <p>
-                <strong>Dashboard:</strong>
-                <a href="${ownerDashboardLink}">
-                  ${ownerDashboardLink}
-                </a>
-              </p>
-            </div>
-          `,
-        })
+      <p>
+        <strong>वॉशरूम:</strong>
+        ${complaint.washroomName}
+      </p>
+
+      <p>
+        <strong>समय:</strong>
+        ${complaint.createdAt.toLocaleString(
+          "en-IN",
+          {
+            timeZone: "Asia/Kolkata",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          }
+        )}
+      </p>
+
+      <p>
+        <strong>विवरण:</strong>
+        ${
+          complaint.issueDescription ||
+          "कोई विवरण उपलब्ध नहीं"
+        }
+      </p>
+
+      <p>
+        <strong>लॉगिन:</strong><br/>
+        <a href="https://feedback.southavenuemall.com/login">
+          https://feedback.southavenuemall.com/login
+        </a>
+      </p>
+
+      <p>
+        कृपया इस शिकायत पर तत्काल ध्यान दें और आवश्यक कार्रवाई सुनिश्चित करें।
+      </p>
+
+      <hr/>
+
+      <p style="color:#b91c1c;font-weight:bold;">
+        यह एक क्रिटिकल एस्केलेशन है और तत्काल हस्तक्षेप अपेक्षित है।
+      </p>
+    </div>
+  `,
+})
 
         await sendOwnerSMS(
           ownerPhones,

@@ -213,30 +213,35 @@ async function main() {
       },
     })
 
-    await prisma.washroomAssignment.upsert({
-      where: {
-        washroomId: washroom.id,
-      },
-      update: {
-        supervisorId: w.supervisorId,
-        generalManagerId: w.gmId,
-      },
-      create: {
-        washroomId: washroom.id,
-        supervisorId: w.supervisorId,
-        generalManagerId: w.gmId,
-      },
-    })
+        const existingAssignment =
+      await prisma.washroomAssignment.findFirst({
+        where: {
+          washroomId: washroom.id,
+        },
+      })
+
+    if (existingAssignment) {
+      await prisma.washroomAssignment.update({
+        where: {
+          id: existingAssignment.id,
+        },
+        data: {
+          supervisorId: w.supervisorId,
+          generalManagerId: w.gmId,
+        },
+      })
+    } else {
+      await prisma.washroomAssignment.create({
+        data: {
+          washroomId: washroom.id,
+          supervisorId: w.supervisorId,
+          generalManagerId: w.gmId,
+        },
+      })
+    }
   }
 
-  console.log("REAL MALL CONFIG SEEDED SUCCESSFULLY")
+  console.log(
+    "REAL MALL CONFIG SEEDED SUCCESSFULLY"
+  )
 }
-
-main()
-  .catch((e) => {
-    console.error(e)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })

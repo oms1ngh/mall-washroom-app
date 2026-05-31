@@ -27,22 +27,50 @@ type Complaint = {
   } | null
 }
 
+
 type DashboardData = {
-  totalComplaints: number
-  negativeComplaints: number
-  positiveFeedbackCount: number
-  resolvedComplaints: number
-  escalatedToGM: number
-  escalatedToDirector: number
-  avgResolutionMinutes: number
-  liveComplaints: Complaint[]
-  escalatedComplaints: Complaint[]
-  reportComplaints: Complaint[]
+  liveComplaints:
+    Complaint[]
+
+  escalatedComplaints:
+    Complaint[]
+
+  reportComplaints:
+    Complaint[]
+
   washrooms: {
     id: number
     name: string
   }[]
+
+  stats: {
+    totalComplaints:
+      number
+
+    negativeComplaints:
+      number
+
+    positiveFeedbackCount:
+      number
+
+    openComplaints:
+      number
+
+    resolvedComplaints:
+      number
+
+    escalatedCount:
+      number
+
+    criticalCount:
+      number
+
+    avgResolutionMinutes:
+      number
+  }
 }
+
+
 
 function formatAvgTime(
   mins: number
@@ -436,19 +464,19 @@ export default function GMDashboard() {
             <p>Total Complaints</p>
             <h3 className="text-3xl font-bold mt-2">
               {
-                data.totalComplaints
+                data.stats.totalComplaints
               }
             </h3>
             <p className="text-sm mt-2">
               Negative:{" "}
               {
-                data.negativeComplaints
+                data.stats.negativeComplaints
               }
             </p>
             <p className="text-sm">
               Positive:{" "}
               {
-                data.positiveFeedbackCount
+                data.stats.positiveFeedbackCount
               }
             </p>
           </div>
@@ -457,7 +485,7 @@ export default function GMDashboard() {
             <p>Resolved</p>
             <h3 className="text-3xl font-bold mt-2">
               {
-                data.resolvedComplaints
+                data.stats.resolvedComplaints
               }
             </h3>
           </div>
@@ -466,7 +494,7 @@ export default function GMDashboard() {
             <p>Escalated</p>
             <h3 className="text-3xl font-bold mt-2">
               {
-                data.escalatedToGM
+                data.stats.escalatedCount
               }
             </h3>
           </div>
@@ -475,7 +503,7 @@ export default function GMDashboard() {
             <p>Critical</p>
             <h3 className="text-3xl font-bold mt-2">
               {
-                data.escalatedToDirector
+                data.stats.criticalCount
               }
             </h3>
           </div>
@@ -484,7 +512,7 @@ export default function GMDashboard() {
             <p>Avg Resolution</p>
             <h3 className="text-2xl font-bold mt-2">
               {formatAvgTime(
-                data.avgResolutionMinutes
+                data.stats.avgResolutionMinutes
               )}
             </h3>
           </div>

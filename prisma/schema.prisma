@@ -75,7 +75,7 @@ model Washroom {
 
 model WashroomAssignment {
   id               Int      @id @default(autoincrement())
-  washroomId       Int      @unique
+  washroomId       Int      
   supervisorId     Int
   generalManagerId Int
 

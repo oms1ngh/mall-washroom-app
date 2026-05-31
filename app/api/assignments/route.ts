@@ -1,74 +1,76 @@
+
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
 export async function GET() {
   try {
-    const washrooms = await prisma.washroom.findMany({
-      include: {
-        assignments: {
-          include: {
-            supervisor: true,
-            generalManager: true,
+    const washrooms =
+      await prisma.washroom.findMany({
+        include: {
+          assignments: {
+            include: {
+              supervisor: true,
+              generalManager: true,
+            },
           },
         },
-      },
-      orderBy: {
-        name: "asc",
-      },
-    })
 
-    const formatted = washrooms.map((washroom) => ({
-      id: washroom.assignments[0]?.id || null,
+        orderBy: {
+          name: "asc",
+        },
+      })
 
-      washroom: {
-        id: washroom.id,
-        name: washroom.name,
-        code: washroom.code,
-        floor: washroom.floor,
-      },
-
-      supervisor:
-        washroom.assignments[0]?.supervisor || {
-          id: 0,
-          name: "",
-          email: "",
-          phone: "",
+    const formatted = washrooms.map(
+      (washroom) => ({
+        washroom: {
+          id: washroom.id,
+          name: washroom.name,
+          code: washroom.code,
+          floor: washroom.floor,
         },
 
-      generalManager:
-        washroom.assignments[0]?.generalManager || {
-          id: 0,
-          name: "",
-          email: "",
-          phone: "",
-        },
+        assignments:
+          washroom.assignments.map(
+            (assignment) => ({
+              id: assignment.id,
 
-      supervisorExtraEmails:
-        washroom.assignments[0]
-          ?.supervisorExtraEmails || "",
+              supervisor:
+                assignment.supervisor,
 
-      supervisorExtraPhones:
-        washroom.assignments[0]
-          ?.supervisorExtraPhones || "",
+              generalManager:
+                assignment.generalManager,
 
-      gmExtraEmails:
-        washroom.assignments[0]
-          ?.gmExtraEmails || "",
+              supervisorExtraEmails:
+                assignment.supervisorExtraEmails ||
+                "",
 
-      gmExtraPhones:
-        washroom.assignments[0]
-          ?.gmExtraPhones || "",
+              supervisorExtraPhones:
+                assignment.supervisorExtraPhones ||
+                "",
 
-      ownerEmails:
-        washroom.assignments[0]
-          ?.ownerEmails || "",
+              gmExtraEmails:
+                assignment.gmExtraEmails ||
+                "",
 
-      ownerPhones:
-        washroom.assignments[0]
-          ?.ownerPhones || "",
-    }))
+              gmExtraPhones:
+                assignment.gmExtraPhones ||
+                "",
 
-    return NextResponse.json(formatted)
+              ownerEmails:
+                assignment.ownerEmails ||
+                "",
+
+              ownerPhones:
+                assignment.ownerPhones ||
+                "",
+            })
+          ),
+      })
+    )
+
+    return NextResponse.json(
+      formatted
+    )
   } catch (error) {
     console.error(
       "ASSIGNMENT GET ERROR:",
@@ -91,24 +93,15 @@ export async function POST(
   try {
     const body = await req.json()
 
-    const existing =
-      await prisma.washroomAssignment.findUnique(
-        {
-          where: {
-            washroomId:
-              body.washroomId,
-          },
-        }
-      )
-
-    if (existing) {
+    // UPDATE EXISTING ASSIGNMENT
+    if (body.id) {
       const updated =
         await prisma.washroomAssignment.update(
           {
             where: {
-              washroomId:
-                body.washroomId,
+              id: body.id,
             },
+
             data: {
               supervisorId:
                 body.supervisorId,
@@ -148,6 +141,7 @@ export async function POST(
       )
     }
 
+    // CREATE NEW ASSIGNMENT
     const created =
       await prisma.washroomAssignment.create(
         {
@@ -188,7 +182,9 @@ export async function POST(
         }
       )
 
-    return NextResponse.json(created)
+    return NextResponse.json(
+      created
+    )
   } catch (error) {
     console.error(
       "ASSIGNMENT SAVE ERROR:",
@@ -204,3 +200,40 @@ export async function POST(
     )
   }
 }
+
+export async function DELETE(
+  req: Request
+) {
+  try {
+    const body = await req.json()
+
+    await prisma.washroomAssignment.delete(
+      {
+        where: {
+          id: body.id,
+        },
+      }
+    )
+
+    return NextResponse.json({
+      success: true,
+    })
+  } catch (error) {
+    console.error(
+      "ASSIGNMENT DELETE ERROR:",
+      error
+    )
+
+    return NextResponse.json(
+      {
+        error:
+          "Failed to delete assignment",
+      },
+      { status: 500 }
+    )
+  }
+}
+
+
+
+

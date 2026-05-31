@@ -13,15 +13,8 @@ type User = {
   isActive?: boolean
 }
 
-type Assignment = {
-  id: number | null
-
-  washroom: {
-    id: number
-    name: string
-    code?: string
-    floor?: string
-  }
+type AssignmentRow = {
+  id: number
 
   supervisor: {
     id: number
@@ -46,6 +39,18 @@ type Assignment = {
   ownerEmails: string
   ownerPhones: string
 }
+
+type Assignment = {
+  washroom: {
+    id: number
+    name: string
+    code?: string
+    floor?: string
+  }
+
+  assignments: AssignmentRow[]
+}
+
 
 type Washroom = {
   id: number
@@ -270,32 +275,237 @@ export default function SuperAdminDashboard() {
     loadData()
   }
 
-  async function deleteWashroom(
-    washroomId: number
-  ) {
-    const confirmDelete = confirm(
-      "Delete this washroom?"
-    )
+async function saveAssignment(
+  assignmentGroup: Assignment,
+  assignment: AssignmentRow
+) {
+  const res = await fetch(
+    "/api/assignments",
+    {
+      method: "POST",
 
-    if (!confirmDelete) return
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
 
-    const res = await fetch(
-      `/api/washrooms/${washroomId}`,
-      {
-        method: "DELETE",
-      }
-    )
+      body: JSON.stringify({
+       
+id:
+  assignment.id > 1000000000
+    ? null
+    : assignment.id,
 
-    const data = await res.json()
 
-    if (!res.ok) {
-      alert(data.error || "Delete failed")
-      return
+
+        washroomId:
+          assignmentGroup.washroom.id,
+
+        supervisorId:
+          assignment.supervisor.id,
+
+        generalManagerId:
+          assignment.generalManager.id,
+
+        supervisorExtraEmails:
+          assignment.supervisorExtraEmails,
+
+        supervisorExtraPhones:
+          assignment.supervisorExtraPhones,
+
+        gmExtraEmails:
+          assignment.gmExtraEmails,
+
+        gmExtraPhones:
+          assignment.gmExtraPhones,
+
+        ownerEmails:
+          assignment.ownerEmails,
+
+        ownerPhones:
+          assignment.ownerPhones,
+      }),
     }
+  )
 
-    alert("Washroom deleted")
-    loadData()
+  const data = await res.json()
+
+  if (!res.ok) {
+    alert(
+      data.error ||
+        "Save failed"
+    )
+
+    return
   }
+
+  alert("Assignment saved")
+
+  loadData()
+}
+
+function addSupervisorRow(
+  assignmentGroup: Assignment
+) {
+  const updated =
+    assignments.map((group) => {
+
+      if (
+        group.washroom.id !==
+        assignmentGroup.washroom.id
+      ) {
+        return group
+      }
+
+      const hasEmptyRow =
+        group.assignments.some(
+          (a) =>
+            a.supervisor.id === 0
+        )
+
+      if (hasEmptyRow) {
+        alert(
+          "Finish current supervisor row first"
+        )
+
+        return group
+      }
+
+      return {
+        ...group,
+
+        assignments: [
+          ...group.assignments,
+
+          {
+            id: Date.now(),
+
+            supervisor: {
+              id: 0,
+              name: "",
+            },
+
+            generalManager: {
+              id: 0,
+              name: "",
+            },
+
+            supervisorExtraEmails:
+              "",
+
+            supervisorExtraPhones:
+              "",
+
+            gmExtraEmails: "",
+
+            gmExtraPhones: "",
+
+            ownerEmails: "",
+
+            ownerPhones: "",
+          },
+        ],
+      }
+    })
+
+  setAssignments(updated)
+}
+
+
+async function deleteAssignment(
+  assignmentId: number
+) {
+
+  // TEMP UNSAVED ROW
+  if (assignmentId > 1000000000) {
+
+    const updated =
+      assignments.map((group) => ({
+        ...group,
+
+        assignments:
+          group.assignments.filter(
+            (a) =>
+              a.id !== assignmentId
+          ),
+      }))
+
+    setAssignments(updated)
+
+    return
+  }
+
+  const confirmDelete = confirm(
+    "Delete this assignment?"
+  )
+
+  if (!confirmDelete) return
+
+  const res = await fetch(
+    "/api/assignments",
+    {
+      method: "DELETE",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+
+      body: JSON.stringify({
+        id: assignmentId,
+      }),
+    }
+  )
+
+  const data = await res.json()
+
+  if (!res.ok) {
+    alert(
+      data.error ||
+        "Delete failed"
+    )
+
+    return
+  }
+
+  alert("Assignment deleted")
+
+  loadData()
+}
+
+async function deleteWashroom(
+  washroomId: number
+) {
+  const confirmDelete = confirm(
+    "Delete this washroom?"
+  )
+
+  if (!confirmDelete) return
+
+  const res = await fetch(
+    `/api/washrooms/${washroomId}`,
+    {
+      method: "DELETE",
+    }
+  )
+
+  const data = await res.json()
+
+  if (!res.ok) {
+    alert(
+      data.error ||
+        "Delete failed"
+    )
+
+    return
+  }
+
+  alert("Washroom deleted")
+
+  loadData()
+}
+
+
 
   return (
     <div className="min-h-screen">
@@ -823,342 +1033,277 @@ export default function SuperAdminDashboard() {
                   <th className="p-4 text-left">
                     Owner Phones
                   </th>
-                  <th className="p-4 text-left">
-                    Actions
-                  </th>
+                  
+<th className="p-4 text-left">
+  Actions
+</th>
+
+<th className="p-4 text-left">
+  Add
+</th>
+
+
                 </tr>
               </thead>
+<tbody>
+  {assignments.map(
+    (assignmentGroup) => {
 
-              <tbody>
-                {assignments.map(
-                  (assignment, index) => {
-                    const supervisors =
-                      users.filter(
-                        (u) =>
-                          u.role ===
-                          "SUPERVISOR"
-                      )
+      const supervisors =
+        users.filter(
+          (u) =>
+            u.role ===
+            "SUPERVISOR"
+        )
 
-                    const gms = users.filter(
-                      (u) =>
-                        u.role ===
-                        "GENERAL_MANAGER"
-                    )
+      const gms =
+        users.filter(
+          (u) =>
+            u.role ===
+            "GENERAL_MANAGER"
+        )
 
-                    return (
-                      <tr
-  key={index}
-  className="border-b"
+      return assignmentGroup.assignments.map(
+        (assignment) => (
+          <tr
+            key={assignment.id}
+            className="border-b"
+          >
+            <td className="p-4">
+              {
+                assignmentGroup
+                  .washroom.name
+              }
+            </td>
+
+            <td className="p-4">
+
+<select
+  className="border p-2 rounded w-full"
+
+  value={
+    assignment.supervisor
+      .id || ""
+  }
+
+  onChange={(e) => {
+    const selected =
+      users.find(
+        (u) =>
+          u.id ===
+          Number(e.target.value)
+      )
+
+    if (!selected) return
+
+    assignment.supervisor = {
+      id: selected.id,
+      name: selected.name,
+      email: selected.email,
+      phone: selected.phone,
+    }
+
+    setAssignments([
+      ...assignments,
+    ])
+  }}
 >
-  <td className="p-4">
-    {assignment.washroom.name}
-  </td>
 
-  <td className="p-4">
-    <select
-      className="border p-2 rounded w-full"
-      value={
-        assignment.supervisor.id || ""
-      }
-      onChange={(e) => {
-        setAssignments((prev) =>
-          prev.map((a, i) =>
-            i === index
-              ? {
-                  ...a,
-                  supervisor: {
-                    id: Number(
-                      e.target.value
-                    ),
-                    name:
-                      supervisors.find(
-                        (s) =>
-                          s.id ===
-                          Number(
-                            e.target.value
-                          )
-                      )?.name || "",
-                  },
-                }
-              : a
-          )
-        )
-      }}
-    >
-      <option value="">
-        Select Supervisor
-      </option>
 
-      {supervisors.map((sup) => (
-        <option
-          key={sup.id}
-          value={sup.id}
-        >
-          {sup.name}
-        </option>
-      ))}
-    </select>
-  </td>
+                <option value="">
+                  Select Supervisor
+                </option>
 
-  <td className="p-4">
-    <textarea
-      className="border p-2 rounded w-full"
-      rows={4}
-      placeholder="one email per line"
-      value={
-        assignment.supervisorExtraEmails ||
-        ""
-      }
-      onChange={(e) =>
-        setAssignments((prev) =>
-          prev.map((a, i) =>
-            i === index
-              ? {
-                  ...a,
-                  supervisorExtraEmails:
-                    e.target.value,
-                }
-              : a
-          )
-        )
-      }
-    />
-  </td>
-
-  <td className="p-4">
-    <textarea
-      className="border p-2 rounded w-full"
-      rows={4}
-      placeholder="one phone per line"
-      value={
-        assignment.supervisorExtraPhones ||
-        ""
-      }
-      onChange={(e) =>
-        setAssignments((prev) =>
-          prev.map((a, i) =>
-            i === index
-              ? {
-                  ...a,
-                  supervisorExtraPhones:
-                    e.target.value,
-                }
-              : a
-          )
-        )
-      }
-    />
-  </td>
-
-  <td className="p-4">
-    <select
-      className="border p-2 rounded w-full"
-      value={
-        assignment.generalManager.id ||
-        ""
-      }
-      onChange={(e) => {
-        setAssignments((prev) =>
-          prev.map((a, i) =>
-            i === index
-              ? {
-                  ...a,
-                  generalManager: {
-                    id: Number(
-                      e.target.value
-                    ),
-                    name:
-                      gms.find(
-                        (g) =>
-                          g.id ===
-                          Number(
-                            e.target.value
-                          )
-                      )?.name || "",
-                  },
-                }
-              : a
-          )
-        )
-      }}
-    >
-      <option value="">
-        Select GM
-      </option>
-
-      {gms.map((gm) => (
-        <option
-          key={gm.id}
-          value={gm.id}
-        >
-          {gm.name}
-        </option>
-      ))}
-    </select>
-  </td>
-
-  <td className="p-4">
-    <textarea
-      className="border p-2 rounded w-full"
-      rows={4}
-      placeholder="one email per line"
-      value={
-        assignment.gmExtraEmails || ""
-      }
-      onChange={(e) =>
-        setAssignments((prev) =>
-          prev.map((a, i) =>
-            i === index
-              ? {
-                  ...a,
-                  gmExtraEmails:
-                    e.target.value,
-                }
-              : a
-          )
-        )
-      }
-    />
-  </td>
-
-  <td className="p-4">
-    <textarea
-      className="border p-2 rounded w-full"
-      rows={4}
-      placeholder="one phone per line"
-      value={
-        assignment.gmExtraPhones || ""
-      }
-      onChange={(e) =>
-        setAssignments((prev) =>
-          prev.map((a, i) =>
-            i === index
-              ? {
-                  ...a,
-                  gmExtraPhones:
-                    e.target.value,
-                }
-              : a
-          )
-        )
-      }
-    />
-  </td>
-
-  <td className="p-4">
-    <textarea
-      className="border p-2 rounded w-full"
-      rows={4}
-      placeholder="owner emails"
-      value={
-        assignment.ownerEmails || ""
-      }
-      onChange={(e) =>
-        setAssignments((prev) =>
-          prev.map((a, i) =>
-            i === index
-              ? {
-                  ...a,
-                  ownerEmails:
-                    e.target.value,
-                }
-              : a
-          )
-        )
-      }
-    />
-  </td>
-
-  <td className="p-4">
-    <textarea
-      className="border p-2 rounded w-full"
-      rows={4}
-      placeholder="owner phones"
-      value={
-        assignment.ownerPhones || ""
-      }
-      onChange={(e) =>
-        setAssignments((prev) =>
-          prev.map((a, i) =>
-            i === index
-              ? {
-                  ...a,
-                  ownerPhones:
-                    e.target.value,
-                }
-              : a
-          )
-        )
-      }
-    />
-  </td>
-
-  <td className="p-4">
-    <button
-      onClick={async () => {
-        const res = await fetch(
-          "/api/assignments",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              washroomId:
-                assignment.washroom.id,
-              supervisorId:
-                assignment.supervisor.id,
-              generalManagerId:
-                assignment.generalManager.id,
-
-              supervisorExtraEmails:
-                assignment.supervisorExtraEmails,
-
-              supervisorExtraPhones:
-                assignment.supervisorExtraPhones,
-
-              gmExtraEmails:
-                assignment.gmExtraEmails,
-
-              gmExtraPhones:
-                assignment.gmExtraPhones,
-
-              ownerEmails:
-                assignment.ownerEmails,
-
-              ownerPhones:
-                assignment.ownerPhones,
-            }),
-          }
-        )
-
-        const data =
-          await res.json()
-
-        if (!res.ok) {
-          alert(
-            data.error ||
-              "Save failed"
-          )
-          return
-        }
-
-        alert(
-          "Notification settings saved"
-        )
-        loadData()
-      }}
-      className="bg-green-600 text-white px-4 py-2 rounded-lg"
-    >
-      Save
-    </button>
-  </td>
-</tr>
-                    )
-                  }
+                {supervisors.map(
+                  (sup) => (
+                    <option
+                      key={sup.id}
+                      value={sup.id}
+                    >
+                      {sup.name}
+                    </option>
+                  )
                 )}
-              </tbody>
+              </select>
+            </td>
+
+            <td className="p-4">
+              <textarea
+                className="border p-2 rounded w-full"
+                rows={4}
+                defaultValue={
+                  assignment.supervisorExtraEmails ||
+                  ""
+                }
+              />
+            </td>
+
+            <td className="p-4">
+              <textarea
+                className="border p-2 rounded w-full"
+                rows={4}
+                defaultValue={
+                  assignment.supervisorExtraPhones ||
+                  ""
+                }
+              />
+            </td>
+
+            <td className="p-4">
+<select
+  className="border p-2 rounded w-full"
+
+  value={
+    assignment
+      .generalManager.id ||
+    ""
+  }
+
+  onChange={(e) => {
+    const selected =
+      users.find(
+        (u) =>
+          u.id ===
+          Number(e.target.value)
+      )
+
+    if (!selected) return
+
+    assignment.generalManager =
+      {
+        id: selected.id,
+        name: selected.name,
+        email: selected.email,
+        phone: selected.phone,
+      }
+
+    setAssignments([
+      ...assignments,
+    ])
+  }}
+>
+
+
+                <option value="">
+                  Select GM
+                </option>
+
+                {gms.map((gm) => (
+                  <option
+                    key={gm.id}
+                    value={gm.id}
+                  >
+                    {gm.name}
+                  </option>
+                ))}
+              </select>
+            </td>
+
+            <td className="p-4">
+              <textarea
+                className="border p-2 rounded w-full"
+                rows={4}
+                defaultValue={
+                  assignment.gmExtraEmails ||
+                  ""
+                }
+              />
+            </td>
+
+            <td className="p-4">
+              <textarea
+                className="border p-2 rounded w-full"
+                rows={4}
+                defaultValue={
+                  assignment.gmExtraPhones ||
+                  ""
+                }
+              />
+            </td>
+
+            <td className="p-4">
+              <textarea
+                className="border p-2 rounded w-full"
+                rows={4}
+                defaultValue={
+                  assignment.ownerEmails ||
+                  ""
+                }
+              />
+            </td>
+
+            <td className="p-4">
+              <textarea
+                className="border p-2 rounded w-full"
+                rows={4}
+                defaultValue={
+                  assignment.ownerPhones ||
+                  ""
+                }
+              />
+            </td>
+
+            
+<td className="p-4">
+
+
+<div className="flex gap-2">
+
+<button
+  onClick={() =>
+    saveAssignment(
+      assignmentGroup,
+      assignment
+    )
+  }
+
+  className="bg-green-600 text-white px-4 py-2 rounded-lg"
+>
+  Save
+</button>
+
+<button
+  onClick={() =>
+    deleteAssignment(
+      assignment.id
+    )
+  }
+
+  className="bg-red-600 text-white px-4 py-2 rounded-lg"
+>
+  Delete
+</button>
+
+</div>
+
+
+
+</td>
+
+<td className="p-4">
+
+<button
+  onClick={() =>
+    addSupervisorRow(
+      assignmentGroup
+    )
+  }
+
+  className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+>
+  + Supervisor
+</button>
+
+</td>
+
+
+          </tr>
+        )
+      )
+    }
+  )}
+</tbody>
+
             </table>
           </div>
         </div>

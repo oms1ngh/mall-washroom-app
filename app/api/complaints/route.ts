@@ -30,19 +30,17 @@ export async function POST(req: Request) {
       )
     }
 
-    const assignment =
-      await prisma.washroomAssignment.findUnique(
-        {
-          where: {
-            washroomId:
-              washroom.id,
-          },
-          include: {
-            supervisor: true,
-            generalManager: true,
-          },
-        }
-      )
+    const assignments =
+  await prisma.washroomAssignment.findMany({
+    where: {
+      washroomId:
+        washroom.id,
+    },
+    include: {
+      supervisor: true,
+      generalManager: true,
+    },
+  })
 
     const cleanlinessStatus =
       body.cleanlinessStatus ===
@@ -99,128 +97,149 @@ export async function POST(req: Request) {
           resolvedAt: null,
 
           supervisorNotified:
-            !autoResolved &&
-            !!assignment,
+  !autoResolved &&
+  assignments.length > 0,
         },
         include: {
           washroom: true,
         },
       })
 
-    if (
-      !autoResolved &&
-      assignment?.supervisor
-    ) {
-      const supervisorEmails =
-        [
-          assignment.supervisor.email,
-          assignment.supervisorExtraEmails,
-        ]
-          .filter(Boolean)
-          .join(",")
 
-      const supervisorPhones =
-        [
-          assignment.supervisor.phone,
-          assignment.supervisorExtraPhones,
-        ]
-          .filter(Boolean)
-          .join(",")
+if (
+  !autoResolved &&
+  assignments.length > 0
+) {
 
-      sendEmail({
-  to: supervisorEmails,
+  // SEND NOTIFICATIONS IN BACKGROUND
+  Promise.all(
 
-  subject:
-    `South Avenue Mall - नई वॉशरूम शिकायत | ${complaint.complaintId}`,
+    assignments.map(
+      async (assignment) => {
 
-  html: `
-    <div style="font-family: Arial, sans-serif; padding:20px;">
-      <h2 style="color:#dc2626;">
-        South Avenue Mall - नई वॉशरूम शिकायत
-      </h2>
+        try {
 
-      <p>
-        वॉशरूम से नई शिकायत प्राप्त हुई है।
-      </p>
+          const supervisorEmails =
+            [
+              assignment
+                .supervisor.email,
 
-      <p>
-        <strong>शिकायत आईडी:</strong>
-        ${complaint.complaintId}
-      </p>
+              assignment
+                .supervisorExtraEmails,
+            ]
+              .filter(Boolean)
+              .join(",")
 
-      <p>
-        <strong>वॉशरूम:</strong>
-        ${complaint.washroomName}
-      </p>
+          const supervisorPhones =
+            [
+              assignment
+                .supervisor.phone,
 
-      <p>
-        <strong>समय:</strong>
-        ${complaint.createdAt.toLocaleString(
-          "en-IN",
-          {
-            timeZone: "Asia/Kolkata",
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-          }
-        )}
-      </p>
+              assignment
+                .supervisorExtraPhones,
+            ]
+              .filter(Boolean)
+              .join(",")
 
-      <p>
-        <strong>स्वच्छता स्थिति:</strong>
-        ${complaint.cleanlinessStatus}
-      </p>
+          await sendEmail({
+            to: supervisorEmails,
 
-      <p>
-        <strong>सुविधाएं कार्यरत:</strong>
-        ${
-          complaint.facilitiesWorking
-            ? "हाँ"
-            : "नहीं"
+            subject:
+              `South Avenue Mall - नई वॉशरूम शिकायत | ${complaint.complaintId}`,
+
+            
+html: `
+  <div style="font-family: Arial, sans-serif; padding:20px;">
+    <h2 style="color:#dc2626;">
+      South Avenue Mall - नई वॉशरूम शिकायत
+    </h2>
+
+    <p>
+      वॉशरूम से नई शिकायत प्राप्त हुई है।
+    </p>
+
+    <p>
+      <strong>शिकायत आईडी:</strong>
+      ${complaint.complaintId}
+    </p>
+
+    <p>
+      <strong>वॉशरूम:</strong>
+      ${complaint.washroomName}
+    </p>
+
+    <p>
+      <strong>समय:</strong>
+      ${complaint.createdAt.toLocaleString(
+        "en-IN",
+        {
+          timeZone: "Asia/Kolkata",
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
         }
-      </p>
+      )}
+    </p>
 
-      <p>
-        <strong>विवरण:</strong>
-        ${
-          complaint.issueDescription ||
-          "कोई विवरण उपलब्ध नहीं"
+    <p>
+      <strong>विवरण:</strong>
+      ${
+        complaint.issueDescription ||
+        "कोई विवरण उपलब्ध नहीं"
+      }
+    </p>
+
+    <p>
+      <strong>लॉगिन:</strong><br/>
+      <a href="https://feedback.southavenuemall.com/login">
+        https://feedback.southavenuemall.com/login
+      </a>
+    </p>
+
+    <p>
+      कृपया लॉगिन करके शिकायत का समाधान करें।
+    </p>
+
+    <hr/>
+
+    <p style="color:red;font-weight:bold;">
+      कृपया 15 मिनट के भीतर शिकायत का समाधान करें।
+      15 मिनट के बाद शिकायत स्वतः GM को एस्केलेट हो जाएगी।
+    </p>
+  </div>
+`,
+
+          })
+
+          await sendSupervisorSMS(
+            supervisorPhones,
+
+            complaint.complaintId,
+
+            complaint.washroomName,
+
+            complaint.issueDescription ||
+              "No details",
+
+            complaint.createdAt
+          )
+
+        } catch (notificationError) {
+
+          console.error(
+            "NOTIFICATION ERROR:",
+            notificationError
+          )
         }
-      </p>
-
-      <p>
-        <strong>लॉगिन:</strong><br/>
-        <a href="https://feedback.southavenuemall.com/login">
-          https://feedback.southavenuemall.com/login
-        </a>
-      </p>
-
-      <p>
-        कृपया लॉगिन करके शिकायत का समाधान करें।
-      </p>
-
-      <hr/>
-
-      <p style="color:red;font-weight:bold;">
-        कृपया 15 मिनट के भीतर शिकायत का समाधान करें।
-        15 मिनट के बाद शिकायत स्वतः GM को एस्केलेट हो जाएगी।
-      </p>
-    </div>
-  `,
-})
-
-      sendSupervisorSMS(
-  supervisorPhones,
-  complaint.complaintId,
-  complaint.washroomName,
-  complaint.issueDescription ||
-    "No details",
-  complaint.createdAt
-)
+      }
+    )
+  )
 }
+
+
 
     return NextResponse.json({
       success: true,
