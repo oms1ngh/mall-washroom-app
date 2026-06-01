@@ -152,7 +152,7 @@ export async function sendSupervisorSMS(
   `&number=${phone}` +
   `&text=${encodeURIComponent(message)}` +
   `&route=6` +
-  `&DLTTemplateId=1707178012827288834` +
+  `&DLTTemplateId=1707178029562203182` +
   `&PEID=1701160257275217983`
 
       return callSms(url)
@@ -193,7 +193,7 @@ export async function sendGMSMS(
   `&number=${phone}` +
   `&text=${encodeURIComponent(message)}` +
   `&route=6` +
-  `&DLTTemplateId=1707178012839878373` +
+  `&DLTTemplateId=1707178029569175753` +
   `&PEID=1701160257275217983`
 
       return callSms(url)
@@ -234,7 +234,7 @@ export async function sendOwnerSMS(
   `&number=${phone}` +
   `&text=${encodeURIComponent(message)}` +
   `&route=6` +
-  `&DLTTemplateId=1707178012847575315` +
+  `&DLTTemplateId=1707178029575076414` +
   `&PEID=1701160257275217983`
 
       return callSms(url)
