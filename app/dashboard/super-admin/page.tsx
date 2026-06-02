@@ -1128,25 +1128,80 @@ async function deleteWashroom(
             </td>
 
             <td className="p-4">
-              <textarea
-                className="border p-2 rounded w-full"
-                rows={4}
-                defaultValue={
-                  assignment.supervisorExtraEmails ||
-                  ""
+        
+<textarea
+  className="border p-2 rounded w-full"
+  rows={4}
+
+  value={
+    assignment.supervisorExtraEmails ||
+    ""
+  }
+
+  onChange={(e) => {
+    setAssignments((prev) =>
+      prev.map((group) => ({
+        ...group,
+
+        assignments:
+          group.assignments.map((a) =>
+            a.id === assignment.id
+              ? {
+                  ...a,
+
+                  supervisorExtraEmails:
+                    e.target.value,
                 }
-              />
+              : a
+          ),
+      }))
+    )
+  }}
+/>
+
+
             </td>
 
             <td className="p-4">
-              <textarea
-                className="border p-2 rounded w-full"
-                rows={4}
-                defaultValue={
-                  assignment.supervisorExtraPhones ||
-                  ""
+<textarea
+  className="border p-2 rounded w-full"
+  rows={4}
+
+  value={
+    assignment.supervisorExtraPhones ||
+    ""
+  }
+
+  
+
+onChange={(e) => {
+  setAssignments((prev) =>
+    prev.map((group) => ({
+      ...group,
+
+      assignments:
+        group.assignments.map(
+          (a) =>
+            a.id ===
+            assignment.id
+              ? {
+                  ...a,
+
+                  supervisorExtraPhones:
+                    e.target.value,
                 }
-              />
+              : a
+        ),
+    }))
+  )
+}}
+
+
+
+
+/>
+
+
             </td>
 
             <td className="p-4">
@@ -1200,47 +1255,144 @@ async function deleteWashroom(
             </td>
 
             <td className="p-4">
-              <textarea
-                className="border p-2 rounded w-full"
-                rows={4}
-                defaultValue={
-                  assignment.gmExtraEmails ||
-                  ""
+            
+<textarea
+  className="border p-2 rounded w-full"
+  rows={4}
+
+  value={
+    assignment.gmExtraEmails || ""
+  }
+
+  onChange={(e) => {
+    setAssignments((prev) =>
+      prev.map((group) => ({
+        ...group,
+
+        assignments:
+          group.assignments.map((a) =>
+            a.id === assignment.id
+              ? {
+                  ...a,
+
+                  gmExtraEmails:
+                    e.target.value,
                 }
-              />
+              : a
+          ),
+      }))
+    )
+  }}
+/>
+
+
             </td>
 
             <td className="p-4">
-              <textarea
-                className="border p-2 rounded w-full"
-                rows={4}
-                defaultValue={
-                  assignment.gmExtraPhones ||
-                  ""
+              
+<textarea
+  className="border p-2 rounded w-full"
+  rows={4}
+
+  value={
+    assignment.gmExtraPhones || ""
+  }
+
+  onChange={(e) => {
+    setAssignments((prev) =>
+      prev.map((group) => ({
+        ...group,
+
+        assignments:
+          group.assignments.map((a) =>
+            a.id === assignment.id
+              ? {
+                  ...a,
+
+                  gmExtraPhones:
+                    e.target.value,
                 }
-              />
+              : a
+          ),
+      }))
+    )
+  }}
+/>
+
+
             </td>
 
             <td className="p-4">
-              <textarea
-                className="border p-2 rounded w-full"
-                rows={4}
-                defaultValue={
-                  assignment.ownerEmails ||
-                  ""
+             
+<textarea
+  className="border p-2 rounded w-full"
+  rows={4}
+
+  value={
+    assignment.ownerEmails || ""
+  }
+
+  onChange={(e) => {
+    setAssignments((prev) =>
+      prev.map((group) => ({
+        ...group,
+
+        assignments:
+          group.assignments.map((a) =>
+            a.id === assignment.id
+              ? {
+                  ...a,
+
+                  ownerEmails:
+                    e.target.value,
                 }
-              />
+              : a
+          ),
+      }))
+    )
+  }}
+/>
+
+
             </td>
 
             <td className="p-4">
-              <textarea
-                className="border p-2 rounded w-full"
-                rows={4}
-                defaultValue={
-                  assignment.ownerPhones ||
-                  ""
+        
+<textarea
+  className="border p-2 rounded w-full"
+  rows={4}
+
+  value={
+    assignment.ownerPhones || ""
+  }
+
+ 
+onChange={(e) => {
+  setAssignments((prev) =>
+    prev.map((group) => ({
+      ...group,
+
+      assignments:
+        group.assignments.map(
+          (a) =>
+            a.id ===
+            assignment.id
+              ? {
+                  ...a,
+
+                  ownerPhones:
+                    e.target.value,
                 }
-              />
+              : a
+        ),
+    }))
+  )
+}}
+
+
+/>
+
+
             </td>
 
             
