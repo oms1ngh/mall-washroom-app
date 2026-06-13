@@ -29,6 +29,19 @@ function formatTime(date?: Date) {
   })
 }
 
+function smsSafeText(
+  text: string,
+  maxLength = 30
+) {
+  if (!text) {
+    return "No details"
+  }
+
+  return text.length > maxLength
+    ? text.substring(0, maxLength) + "..."
+    : text
+}
+
 export async function sendEmail({
   to,
   subject,
@@ -132,6 +145,9 @@ export async function sendSupervisorSMS(
   const time =
     formatTime(createdAt)
 
+  const shortIssue =
+  smsSafeText(issue)
+
   await Promise.all(
     phoneList.map((phone) => {
       const message =
@@ -139,7 +155,7 @@ export async function sendSupervisorSMS(
   `आईडी: ${complaintId} ` +
   `वॉशरूम: ${washroomName} ` +
   `समय: ${time} ` +
-  `विवरण: ${issue} ` +
+  `विवरण: ${shortIssue} ` +
   `लॉगिन: ${LOGIN_URL}`
 
       const url =
@@ -172,6 +188,9 @@ export async function sendGMSMS(
 
   const time =
     formatTime(createdAt)
+    const shortIssue =
+  smsSafeText(issue)
+
 
   await Promise.all(
     phoneList.map((phone) => {
@@ -180,7 +199,7 @@ export async function sendGMSMS(
   `आईडी: ${complaintId} ` +
   `वॉशरूम: ${washroomName} ` +
   `समय: ${time} ` +
-  `विवरण: ${issue} ` +
+  `विवरण: ${shortIssue} ` +
   `लॉगिन: ${LOGIN_URL}`
 
       const url =
@@ -213,6 +232,8 @@ export async function sendOwnerSMS(
 
   const time =
     formatTime(createdAt)
+    const shortIssue =
+  smsSafeText(issue)
 
   await Promise.all(
     phoneList.map((phone) => {
@@ -221,7 +242,7 @@ export async function sendOwnerSMS(
   `आईडी: ${complaintId} ` +
   `वॉशरूम: ${washroomName} ` +
   `समय: ${time} ` +
-  `विवरण: ${issue} ` +
+  `विवरण: ${shortIssue} ` +
   `लॉगिन: ${LOGIN_URL}`
 
       const url =
