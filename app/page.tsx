@@ -129,6 +129,11 @@ export default function Home() {
   const cleanlinessOptions = [
     { label: 'Very Clean', icon: Sparkles, color: 'text-green-500' },
     { label: 'Clean', icon: ThumbsUp, color: 'text-green-600' },
+    {
+      label: 'Clean but toiletries unavailable',
+      icon: XCircle,
+      color: 'text-orange-500',
+    },
     { label: 'Not Clean', icon: Meh, color: 'text-yellow-500' },
     { label: 'Dirty', icon: Frown, color: 'text-pink-600' },
   ]
@@ -171,7 +176,7 @@ export default function Home() {
             1. How was the cleanliness? *
           </h2>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-5">
             {cleanlinessOptions.map((item) => {
               const Icon = item.icon
 
@@ -189,7 +194,7 @@ export default function Home() {
                   <Icon
                     className={`mx-auto mb-3 h-7 w-7 md:h-10 md:w-10 ${item.color}`}
                   />
-                  <p className="text-sm md:text-xl font-medium">
+                  <p className="text-sm md:text-base font-medium">
                     {item.label}
                   </p>
                 </button>

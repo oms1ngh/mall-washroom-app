@@ -47,17 +47,41 @@ export async function POST(req: Request) {
       "Very Clean"
         ? "VERY_CLEAN"
         : body.cleanlinessStatus ===
-          "Clean"
+          "Clean" ||
+          body.cleanlinessStatus ===
+            "Clean but toiletries unavailable"
         ? "CLEAN"
         : body.cleanlinessStatus ===
           "Not Clean"
         ? "NOT_CLEAN"
         : "DIRTY"
 
+    const toiletriesUnavailable =
+      body.cleanlinessStatus ===
+      "Clean but toiletries unavailable"
+
     const autoResolved =
-      cleanlinessStatus ===
-        "VERY_CLEAN" ||
-      cleanlinessStatus === "CLEAN"
+      !toiletriesUnavailable &&
+      cleanlinessStatus !== "NOT_CLEAN" &&
+      cleanlinessStatus !== "DIRTY" &&
+      body.facilitiesWorking === "Yes"
+
+    const submittedIssue =
+      body.issueDescription ||
+      body.feedback ||
+      body.comment ||
+      body.comments ||
+      null
+
+    const issueDescription =
+      toiletriesUnavailable
+        ? [
+            submittedIssue,
+            "Clean washroom, toiletries unavailable",
+          ]
+            .filter(Boolean)
+            .join(". ")
+        : submittedIssue
 
     const complaint =
       await prisma.complaint.create({
@@ -83,12 +107,7 @@ export async function POST(req: Request) {
             body.facilitiesWorking ===
             "Yes",
 
-          issueDescription:
-            body.issueDescription ||
-            body.feedback ||
-            body.comment ||
-            body.comments ||
-            null,
+          issueDescription,
 
           status: autoResolved
             ? "POSITIVE_FEEDBACK"
